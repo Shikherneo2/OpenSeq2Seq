@@ -9,8 +9,6 @@ import tensorflow as tf
 
 from tensorflow.python.ops.rnn_cell import ResidualWrapper, DropoutWrapper
 from open_seq2seq.parts.rnns.weight_drop import WeightDropLayerNormBasicLSTMCell
-from open_seq2seq.parts.rnns.slstm import BasicSLSTMCell
-from open_seq2seq.parts.rnns.glstm import GLSTMCell
 from open_seq2seq.parts.rnns.zoneout import ZoneoutWrapper
 
 

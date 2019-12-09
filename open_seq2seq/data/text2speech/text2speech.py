@@ -135,11 +135,11 @@ class Text2SpeechDataLayer(DataLayer):
     header = None
 
     if self.params["dataset"] == "LJ":
-      self._sampling_rate = 22050
+      self._sampling_rate = self.params.get("sampling_rate", 22050)
       self._n_fft = self.params.get("n_fft", 1024)
     elif self.params["dataset"] == "MAILABS":
-      self._sampling_rate = 16000
-      self._n_fft = 800
+      self._sampling_rate = self.params.get("n_fft", 800)
+      self._n_fft = self.params.get("sampling_rate", 16000)
 
     # Character level vocab
     self.params['char2idx'] = load_pre_existing_vocabulary(
@@ -471,13 +471,16 @@ class Text2SpeechDataLayer(DataLayer):
           self.params['num_audio_features'],
           features_type=features_type,
           n_fft=self._n_fft,
+          win_length=self.params['win_length'],
+          hop_length=self.get_params['hop_length'],
           mag_power=self.params.get('mag_power', 2),
           feature_normalize=self.params["feature_normalize"],
           mean=self.params.get("feature_normalize_mean", 0.),
           std=self.params.get("feature_normalize_std", 1.),
           trim=self.params.get("trim", False),
           data_min=self.params.get("data_min", 1e-5),
-          mel_basis=self._mel_basis
+          mel_basis=self._mel_basis,
+          sampling_rate_param=self._sampling_rate
       )
 
       if self.use_cache:

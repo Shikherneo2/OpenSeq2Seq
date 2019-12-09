@@ -11,8 +11,8 @@ from open_seq2seq.optimizers.lr_policies import fixed_lr, transformer_policy, ex
 
 base_model = Text2SpeechTacotron
 
-dataset = "LJ"
-dataset_location = "/data/speech/LJSpeech"
+dataset = "MAILABS"
+dataset_location = DL_REPLACE
 output_type = "both"
 
 if dataset == "MAILABS":
@@ -21,12 +21,20 @@ if dataset == "MAILABS":
   train = "train.csv"
   val = "val.csv"
   batch_size = 32
+  n_fft=800
+  sampling_rate=16000
+  win_length=None #defaults to n_fft
+  hop_length=None #defaults to n_fft/4
 elif dataset == "LJ":
   trim = False
   mag_num_feats = 513
   train = "train_32.csv"
   val = "val_32.csv"
   batch_size = 48
+  n_fft=1024
+  sampling_rate=22050
+  win_length=None #defaults to n_fft
+  hop_length=None #defaults to n_fft/4
 else:
   raise ValueError("Unknown dataset")
 
@@ -53,9 +61,9 @@ else:
 base_params = {
   "random_seed": 0,
   "use_horovod": False,
-  "max_steps": 100000,
+  "num_gpus": 2,
+  "num_epochs": 25,
 
-  "num_gpus": 1,
   "batch_size_per_gpu": batch_size,
 
   "save_summaries_steps": 50,
@@ -64,7 +72,7 @@ base_params = {
   "eval_steps": 500,
   "save_checkpoint_steps": 2500,
   "save_to_tensorboard": True,
-  "logdir": "result/tacotron-LJ-float",
+  "logdir": "result/tacotron-gst-8gpu",
   "max_grad_norm":1.,
 
   "optimizer": "Adam",
@@ -72,10 +80,10 @@ base_params = {
   "lr_policy": exp_decay,
   "lr_policy_params": {
     "learning_rate": 1e-3,
-    "decay_steps": 20000,
+    "decay_steps": 10000,
     "decay_rate": 0.1,
     "use_staircase_decay": False,
-    "begin_decay_at": 45000,
+    "begin_decay_at": 20000,
     "min_lr": 1e-5,
   },
   "dtype": tf.float32,
@@ -117,6 +125,44 @@ base_params = {
     "zoneout_prob": 0.,
 
     "data_format": "channels_last",
+
+    "style_embedding_enable": True,
+    "style_embedding_params": {
+      "conv_layers": [
+        {
+          "kernel_size": [3,3], "stride": [2,2],
+          "num_channels": 32, "padding": "SAME"
+        },
+        {
+          "kernel_size": [3,3], "stride": [2,2],
+          "num_channels": 32, "padding": "SAME"
+        },
+        {
+          "kernel_size": [3,3], "stride": [2,2],
+          "num_channels": 64, "padding": "SAME"
+        },
+        {
+          "kernel_size": [3,3], "stride": [2,2],
+          "num_channels": 64, "padding": "SAME"
+        },
+        {
+          "kernel_size": [3,3], "stride": [2,2],
+          "num_channels": 128, "padding": "SAME"
+        },
+        {
+          "kernel_size": [3,3], "stride": [2,2],
+          "num_channels": 128, "padding": "SAME"
+        }
+      ],
+      "num_rnn_layers": 1,
+      "rnn_cell_dim": 128,
+      "rnn_unidirectional": True,
+      "rnn_type": tf.nn.rnn_cell.GRUCell,
+      "emb_size": 512,
+      'attention_layer_size': 512,
+      "num_tokens": 32,
+      "num_heads": 8
+    }
   },
 
   "decoder": Tacotron2Decoder,
@@ -202,6 +248,7 @@ train_params = {
       os.path.join(dataset_location, train),
     ],
     "shuffle": True,
+    "style_input": "wav"
   },
 }
 
@@ -213,25 +260,16 @@ eval_params = {
     "duration_max":10000,
     "duration_min":0,
     "shuffle": False,
+    "style_input": "wav"
   },
 }
 
 infer_params = {
   "data_layer_params": {
-    "dataset_files": [
-      os.path.join(dataset_location, "test.csv"),
-    ],
+    "dataset_files": ["generate.csv"],
     "duration_max":10000,
     "duration_min":0,
     "shuffle": False,
-  },
-}
-
-interactive_infer_params = {
-  "data_layer_params": {
-    "dataset_files": [],
-    "duration_max":10000,
-    "duration_min":0,
-    "shuffle": False,
+    "style_input": "wav"
   },
 }

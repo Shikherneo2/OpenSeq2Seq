@@ -21,7 +21,7 @@ from __future__ import print_function
 import tensorflow as tf
 
 
-class Attention(tf.layers.Layer):
+class AttentionMechanism(tf.layers.Layer):
   """Multi-headed attention layer."""
 
   def __init__(

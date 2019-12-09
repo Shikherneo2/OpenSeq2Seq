@@ -13,6 +13,7 @@ def get_speech_features_from_file(
     features_type='magnitude',
     n_fft=1024,
     hop_length=None,
+    win_length=None,
     mag_power=2,
     feature_normalize=False,
     mean=0.,
@@ -22,7 +23,8 @@ def get_speech_features_from_file(
     return_raw_audio=False,
     return_audio_duration=False,
     augmentation=None,
-    mel_basis=None
+    mel_basis=None,
+    sampling_rate_param=16000
 ):
   """ Helper function to retrieve spectrograms from wav files
 
@@ -47,7 +49,9 @@ def get_speech_features_from_file(
     num_features].
   """
   # load audio signal
-  signal, fs = librosa.core.load(filename, sr=None)
+  if win_length is None:
+    win_length = n_fft
+  signal, fs = librosa.core.load(filename, sr=sampling_rate_param)
   if hop_length is None:
     hop_length = int(n_fft / 4)
   if trim:
@@ -84,7 +88,7 @@ def get_speech_features_from_file(
 
   speech_features = get_speech_features(
       signal, fs, num_features, features_type, n_fft,
-      hop_length, mag_power, feature_normalize, mean, std, data_min, mel_basis
+      hop_length, win_length, mag_power, feature_normalize, mean, std, data_min, mel_basis
   )
 
   if return_raw_audio:
@@ -101,7 +105,8 @@ def get_speech_features(
     num_features,
     features_type='magnitude',
     n_fft=1024,
-    hop_length=256,
+    hop_length_param=256,
+    win_length_param=1024,
     mag_power=2,
     feature_normalize=False,
     mean=0.,
@@ -143,7 +148,7 @@ def get_speech_features(
   else:
     num_features_mel = num_features_mag = num_features
 
-  complex_spec = librosa.stft(y=signal, n_fft=n_fft)
+  complex_spec = librosa.stft(y=signal, n_fft=n_fft, hop_length=hop_length_param, win_length=win_length_param)
   mag, _ = librosa.magphase(complex_spec, power=mag_power)
 
   if features_type == 'magnitude' or features_type == "both":
