@@ -127,8 +127,7 @@ def train(train_model, eval_model=None, debug_port=None, custom_hooks=None):
     for var in tf.global_variables():
       var_name = var.name.split(':')[0]
       if var_name in vars_in_checkpoint:
-        if var.shape == vars_in_checkpoint[var_name] and \
-            'global_step' not in var_name:
+        if var.shape == vars_in_checkpoint[var_name] and 'global_step' not in var_name:
           vars_to_load.append(var)
 
     print('VARS_TO_LOAD:')

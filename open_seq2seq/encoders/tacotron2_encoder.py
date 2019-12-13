@@ -158,8 +158,7 @@ class Tacotron2Encoder(Encoder):
             "enabled"
         )
       with tf.variable_scope("style_encoder"):
-        if (self._model.get_data_layer().params.get("style_input", None)
-            == "wav"):
+        if ( self._model.get_data_layer().params.get("style_input", None) == "wav" ):
           style_spec = input_dict['source_tensors'][2]
           style_len = input_dict['source_tensors'][3]
           style_embedding = self._embed_style(style_spec, style_len)

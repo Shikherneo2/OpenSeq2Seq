@@ -263,8 +263,7 @@ class Text2SpeechDataLayer(DataLayer):
         n_samples = self.params['n_samples_eval']
         self._files = self._files.iloc[:n_samples]
 
-    if (self.params['mode'] != 'infer'
-        or self.params.get("style_input", None) == "wav"):
+    if (self.params['mode'] != 'infer' or self.params.get("style_input", None) == "wav"):
       cols = ['wav_filename', 'transcript']
     else:
       cols = 'transcript'
@@ -307,8 +306,7 @@ class Text2SpeechDataLayer(DataLayer):
       else:
         num_audio_features = self.params['num_audio_features']
 
-      if (self.params['mode'] != 'infer'
-          or self.params.get("style_input", None) == "wav"):
+      if( self.params['mode'] != 'infer' or self.params.get("style_input", None) == "wav" ):
         self._dataset = self._dataset.map(
             lambda line: tf.py_func(
                 self._parse_audio_transcript_element,
@@ -368,10 +366,8 @@ class Text2SpeechDataLayer(DataLayer):
       self._iterator = self._dataset.prefetch(tf.contrib.data.AUTOTUNE)\
                                     .make_initializable_iterator()
 
-      if (self.params['mode'] != 'infer'
-          or self.params.get("style_input", None) == "wav"):
-        text, text_length, spec, stop_token_target, spec_length = self._iterator\
-                                                                      .get_next()
+      if( self.params['mode'] != 'infer' or self.params.get("style_input", None) == "wav" ):
+        text, text_length, spec, stop_token_target, spec_length = self._iterator.get_next()
         # need to explicitly set batch size dimension
         # (it is employed in the model)
         spec.set_shape(
