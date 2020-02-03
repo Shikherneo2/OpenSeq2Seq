@@ -2,6 +2,7 @@
 from __future__ import absolute_import, division, print_function
 from __future__ import unicode_literals
 
+import os
 import librosa
 import matplotlib as mpl
 import numpy as np
@@ -354,6 +355,7 @@ class Text2Speech(EncoderDecoderModel):
         stop_tokens_sample = stop_tokens[j]
 
         specs = [predicted_final_spec]
+        np.save( os.path.join(self.params["logdir"], "mel-"+str(i * batch_size + j)+".npy"), predicted_final_spec)
         titles = ["final spectrogram"]
         audio_length = sequence_lengths[j]
 
@@ -372,6 +374,7 @@ class Text2Speech(EncoderDecoderModel):
           titles.append("mag spectrogram from mel basis")
           specs.append(output_values[5][j])
           titles.append("mag spectrogram from proj layer")
+          np.save( os.path.join(self.params["logdir"], "mag-"+str(i * batch_size + j)+".npy"), output_values[5][j])
 
         im_summary = plot_spectrograms(
             specs,

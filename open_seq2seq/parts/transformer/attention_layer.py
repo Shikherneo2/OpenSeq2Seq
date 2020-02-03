@@ -18,10 +18,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
+import numpy as np
 import tensorflow as tf
 
 
-class AttentionMechanism(tf.layers.Layer):
+class Attention(tf.layers.Layer):
   """Multi-headed attention layer."""
 
   def __init__(
@@ -210,6 +212,7 @@ class AttentionMechanism(tf.layers.Layer):
 
     if self.train:
       weights = tf.nn.dropout(weights, keep_prob=1 - self.attention_dropout)
+    
     attention_output = tf.matmul(weights, v)
 
     # Recombine heads --> [batch_size, length, hidden_size]
@@ -217,7 +220,7 @@ class AttentionMechanism(tf.layers.Layer):
 
     # Run the combined outputs through another linear projection layer.
     attention_output = self.output_dense_layer(attention_output)
-    return attention_output
+    return weights, attention_output
 
 
 class SelfAttention(Attention):
