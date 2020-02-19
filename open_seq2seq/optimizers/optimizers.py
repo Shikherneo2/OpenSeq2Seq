@@ -313,13 +313,10 @@ def post_process_gradients(grads_and_vars, summaries, lr,
 
     if grad_values is not None:
       var_name = variable.name.replace(":", "_")
-      if "gradients" in summaries:
-        # need to mask nans for automatic loss scaling
-        tf.summary.histogram("gradients/%s" % var_name, mask_nans(grad_values))
+      
       if "gradient_norm" in summaries:
         tf.summary.scalar("gradient_norm/%s" % var_name, tf.norm(grad_values))
-      if "variables" in summaries:
-        tf.summary.histogram("variables/%s" % var_name, var_values)
+      
       if "variable_norm" in summaries:
         tf.summary.scalar("variable_norm/%s" % var_name, tf.norm(var_values))
 

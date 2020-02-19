@@ -92,3 +92,7 @@ ENV/
 
 .vscode
 .vscode/*
+*.npy
+logs*/
+dataset/
+*.gz
