@@ -167,7 +167,7 @@ base_params = {
       "emb_size": 512,
       'attention_layer_size': 512,
       "num_tokens": 32,
-      "num_heads": 8
+      "num_heads": 0
     }
   },
 

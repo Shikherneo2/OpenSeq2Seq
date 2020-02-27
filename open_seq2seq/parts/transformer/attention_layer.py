@@ -137,10 +137,11 @@ class Attention(tf.layers.Layer):
       cache["k"] = k
       cache["v"] = v
 
-    # Split q, k, v into heads.
-    q = self.split_heads(q)
-    k = self.split_heads(k)
-    v = self.split_heads(v)
+    if( self.num_heads>0 ):
+      # Split q, k, v into heads.
+      q = self.split_heads(q)
+      k = self.split_heads(k)
+      v = self.split_heads(v)
 
     if self.mode == "loung":
       # Scale q to prevent the dot product between q and k from growing too large.
@@ -189,9 +190,14 @@ class Attention(tf.layers.Layer):
         logits += bias
         weights = tf.nn.softmax(logits, name="attention_weights")
     elif self.mode == "bahdanau":
-      att_v = tf.get_variable(
-        "attention_v", [self.hidden_size // self.num_heads], dtype=q.dtype
+      if( self.num_heads==0 ):
+        att_v = tf.get_variable(
+        "attention_v", [self.hidden_size], dtype=q.dtype
       )
+      else:
+        att_v = tf.get_variable(
+          "attention_v", [self.hidden_size // self.num_heads], dtype=q.dtype
+        )
 
       # Compute the attention score
       if bias is not None:
@@ -215,8 +221,9 @@ class Attention(tf.layers.Layer):
     
     attention_output = tf.matmul(weights, v)
 
-    # Recombine heads --> [batch_size, length, hidden_size]
-    attention_output = self.combine_heads(attention_output)
+    if( self.num_heads>0 ):
+      # Recombine heads --> [batch_size, length, hidden_size]
+      attention_output = self.combine_heads(attention_output)
 
     # Run the combined outputs through another linear projection layer.
     attention_output = self.output_dense_layer(attention_output)
