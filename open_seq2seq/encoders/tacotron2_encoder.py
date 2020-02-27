@@ -498,7 +498,8 @@ class Tacotron2Encoder(Encoder):
     gst_embedding = tf.nn.tanh(gst_embedding)
     gst_embedding = tf.expand_dims(gst_embedding, 0)
     gst_embedding = tf.tile(gst_embedding, [batch_size, 1, 1])
-    token_embeddings = attention(top_layer, gst_embedding, None)
+    token_weights, token_embeddings = attention(top_layer, gst_embedding, None)
+    
     token_embeddings = tf.squeeze(token_embeddings, 1)
 
     return token_embeddings

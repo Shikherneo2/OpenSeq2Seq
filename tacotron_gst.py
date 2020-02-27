@@ -11,8 +11,8 @@ from open_seq2seq.optimizers.lr_policies import fixed_lr, transformer_policy, ex
 
 base_model = Text2SpeechTacotron
 
-dataset = "MAILABS"
-dataset_location = DL_REPLACE
+dataset = "LJ"
+dataset_location = "/mydata/"
 output_type = "both"
 
 if dataset == "MAILABS":
@@ -25,16 +25,18 @@ if dataset == "MAILABS":
   sampling_rate=16000
   win_length=None #defaults to n_fft
   hop_length=None #defaults to n_fft/4
+
 elif dataset == "LJ":
   trim = False
   mag_num_feats = 513
   train = "train_32.csv"
-  val = "val_32.csv"
-  batch_size = 48
+  val = "val.csv"
+  batch_size = 60
   n_fft=1024
   sampling_rate=22050
-  win_length=None #defaults to n_fft
-  hop_length=None #defaults to n_fft/4
+  win_length=1024 #defaults to n_fft
+  hop_length=256 #defaults to n_fft/4
+
 else:
   raise ValueError("Unknown dataset")
 
@@ -59,20 +61,22 @@ else:
   raise ValueError("Unknown param for output_type")
 
 base_params = {
-  "random_seed": 0,
-  "use_horovod": False,
-  "num_gpus": 2,
-  "num_epochs": 25,
+  "win_length": win_length,
+	"hop_length": hop_length,
+	"random_seed": 0,
+  "use_horovod": True,
+  "num_gpus": 8,
+  "num_epochs": 500,
 
   "batch_size_per_gpu": batch_size,
 
   "save_summaries_steps": 50,
   "print_loss_steps": 50,
-  "print_samples_steps": 500,
-  "eval_steps": 500,
-  "save_checkpoint_steps": 2500,
+  "print_samples_steps": 1000,
+  "eval_steps": 1000,
+  "save_checkpoint_steps": 1000,
   "save_to_tensorboard": True,
-  "logdir": "result/tacotron-gst-8gpu",
+  "logdir": "/mydata/new_results",
   "max_grad_norm":1.,
 
   "optimizer": "Adam",
@@ -247,7 +251,7 @@ base_params = {
 train_params = {
   "data_layer_params": {
     "dataset_files": [
-      os.path.join(dataset_location, train),
+      os.path.join(dataset_location, "train.csv"),
     ],
     "shuffle": True,
     "style_input": "wav"
