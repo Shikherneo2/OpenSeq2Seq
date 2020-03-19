@@ -176,7 +176,7 @@ base_params = {
     "zoneout_prob": 0.,
     "dropout_prob": 0.1,
     
-    'attention_type': 'location',
+    'attention_type': 'graves',
     'attention_layer_size': 128,
     'attention_bias': True,
 

@@ -63,7 +63,8 @@ __all__ = [
     "AttentionMechanism", "AttentionWrapper", "AttentionWrapperState",
     "LuongAttention", "BahdanauAttention", "hardmax", "safe_cumprod",
     "monotonic_attention", "BahdanauMonotonicAttention",
-    "LuongMonotonicAttention", "LocationSensitiveAttention"
+    "LuongMonotonicAttention", "LocationSensitiveAttention",
+    "GravesAttention"
 ]
 
 _zero_state_tensors = rnn_cell_impl._zero_state_tensors  # pylint: disable=protected-access
@@ -176,7 +177,24 @@ class _BaseAttentionMechanism(AttentionMechanism):
     1. Storing the query and memory layers.
     2. Preprocessing and storing the memory.
   """
-
+# query_layer=layers_core.Dense(
+#             num_units, name="query_layer", use_bias=False, dtype=dtype
+#         ),
+#         memory_layer = Conv1D(
+#             name="memory_layer".format(name),
+#             filters=num_units,
+#             kernel_size=1,
+#             strides=1,
+#             padding="SAME",
+#             use_bias=False,
+#             data_format="channels_last",
+#             dtype=dtype
+#         ),
+#         memory=memory,
+#         probability_fn=wrapped_probability_fn,
+#         memory_sequence_length=memory_sequence_length,
+#         score_mask_value=score_mask_value,
+#         name=name
   def __init__(
       self,
       query_layer,
@@ -746,6 +764,115 @@ class ZhaopengLocationLayer(layers_base.Layer):
     return location_attention
 
 
+class GravesAttention(_BaseAttentionMechanism):
+  """Implements Graves-style (additive) GMM based attention mechanism. Ported to tensorflow from pytorch code by Mozilla TTS.
+  https://github.com/mozilla/TTS/blob/dev/layers/common_layers.py#L147
+
+  The implementation is described in:
+
+  arxiv paper link
+  """
+  
+  def __init__(
+      self,
+      num_units,
+      memory, #encoder_outputs
+      query_dim=None,
+      memory_sequence_length=None, #encoder_sequence_length
+      probability_fn=None, #tf.nn.softmax
+      score_mask_value=None,
+      dtype=None,
+      use_bias=False,
+      use_coverage=True,
+      location_attn_type="chorowski",
+      location_attention_params=None,
+      name="GravesAttention",
+      training=True,
+      name="GravesAttention"
+  ):
+    
+    
+    wrapped_probability_fn = lambda score, _: probability_fn(score)
+    super(GravesAttention, self).__init__(
+        query_layer=None,
+        memory_layer = None,
+        memory=memory,
+        probability_fn=wrapped_probability_fn,
+        memory_sequence_length=memory_sequence_length,
+        score_mask_value=None,
+        name=name
+    )
+    self.training = training
+    self.eps = 1e-5
+    # Add names to the dense layer??
+    # Number of gaussians in the mixture
+    self.K = 5
+
+    # Mimicking pytorch's default bias initializer
+    m = math.sqrt(1.0/self.K)
+    bias_random_init = np.random.uniform( -m, m, self.K)
+    # zeros, 1-mean, 10-std
+    bias_init = tf.constant_initializer( np.hstack([bias_random_init, np.ones(self.K), np.full(self.K, 10)]) ) 
+    layer1 = tf.layers.Dense( units=num_units, activation="relu" ) # from query to query
+    layer2 = tf.layers.Dense( units=3*self.K, bias_initializer=bias_init )
+    
+    self.N_a = lambda x: layer2(layer1(x))
+
+    self.seq_len = self._alignment_size
+
+    self.J = tf.cast( tf.range( self.seq_len + 2 ), dtype=tf.float32) + 0.5
+    self.mu_prev = tf.constant( 0, shape=(self._batch_size, self.K), dtype=tf.float32  )
+
+
+  def __call__(self, query, state):
+      # expanded_alignments = array_ops.expand_dims(state, 1)
+      # context = math_ops.matmul(expanded_alignments, self.values)
+      seq_length = self.seq_len
+
+      gbk_t = self.N_a( query )
+
+      print("Mu, vars:")
+      print(gbk_t.get_shape())
+
+      g_t = tf.slice(gbk_t, [0, 0], [self._batch_size, self.K] )
+      b_t = tf.slice(gbk_t, [0, 1], [self._batch_size, self.K] )
+      k_t = tf.slice(gbk_t, [0, 2], [self._batch_size, self.K] )
+
+      g_t = tf.layers.dropout( g_t, rate=0.5, training=self.training )
+
+      sig_t = tf.math.softplus(b_t) + self.eps
+      mu_t = self.mu_prev + tf.math.softplus(k_t)
+      g_t = tf.nn.softmax( g_t, axis=-1) + self.eps
+
+      j = tf.slice( self.J, [0], [ self.seq_len+1 ] )
+
+      # attention_weights
+      temp = 1 + tf.nn.sigmoid( (tf.expand_dims(mu_t, -1) - j)/ tf.expand_dims(sig_t, -1) )
+      phi_t = tf.expand_dims(g_t, -1) * (1/temp)
+
+      # discretize
+      alpha_t = tf.squeeze( tf.reduce_sum( phi_t, 1 ) )
+      
+      print(alpha_t.get_shape())
+      # is sequence length of alpha_t the same as mu,sig?**********************
+      a = tf.slice( alpha_t, [0, 1], [self._batch_size, tf.get_shape(alpha_t)[1]-1] )
+      b = tf.slice( alpha_t, [0, 0], [self._batch_size, tf.get_shape(alpha_t)[1]-1] )
+      alpha_t = a-b
+      
+      #replace 0 with 1e-8
+      alpha_t = tf.where( tf.equal( 0, alpha_t ), 1e-8 * tf.ones_like( alpha_t ), alpha_t )
+      self.mu_prev = mu_t
+      
+      print(alpha_t.get_shape())
+      if self._use_coverage:
+        next_state = alpha_t + state
+      else:
+        next_state = alpha_t
+      #ret = tf.matmul( alpha_t, query  )
+      return alpha_t, next_state
+
+
+
 class LocationSensitiveAttention(_BaseAttentionMechanism):
   """Implements Bahdanau-style (additive) scoring function with cumulative
   location information.
@@ -999,9 +1126,7 @@ def monotonic_attention(p_choose_i, previous_attention, mode):
   return attention
 
 
-def _monotonic_probability_fn(
-    score, previous_alignments, sigmoid_noise, mode, seed=None
-):
+def _monotonic_probability_fn( score, previous_alignments, sigmoid_noise, mode, seed=None ):
   """Attention probability function for monotonic attention.
 
   Takes in unnormalized attention scores, adds pre-sigmoid noise to encourage
