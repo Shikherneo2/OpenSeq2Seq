@@ -36,7 +36,7 @@ from six.moves import range
 import collections
 import functools
 import math
-
+import tensorflow as tf
 import numpy as np
 
 from tensorflow.contrib.framework.python.framework import tensor_util
@@ -248,14 +248,14 @@ class _BaseAttentionMechanism(AttentionMechanism):
       )
     self._query_layer = query_layer
     self._memory_layer = memory_layer
-    self.dtype = memory_layer.dtype
+    self.dtype = memory.dtype
     if not callable(probability_fn):
       raise TypeError(
           "probability_fn must be callable, saw type: %s" %
           type(probability_fn).__name__
       )
     if score_mask_value is None:
-      score_mask_value = dtypes.as_dtype(self._memory_layer.dtype
+      score_mask_value = dtypes.as_dtype(self.dtype
                                          ).as_numpy_dtype(-np.inf)
     self._probability_fn = lambda score, prev: (  # pylint:disable=g-long-lambda
         probability_fn(
@@ -786,7 +786,6 @@ class GravesAttention(_BaseAttentionMechanism):
       use_coverage=True,
       location_attn_type="chorowski",
       location_attention_params=None,
-      name="GravesAttention",
       training=True,
       name="GravesAttention"
   ):
@@ -818,8 +817,8 @@ class GravesAttention(_BaseAttentionMechanism):
     
     self.N_a = lambda x: layer2(layer1(x))
 
-    self.seq_len = self._alignment_size
-
+    self.seq_len = self._alignments_size
+    self._use_coverage = use_coverage
     self.J = tf.cast( tf.range( self.seq_len + 2 ), dtype=tf.float32) + 0.5
     self.mu_prev = tf.constant( 0, shape=(self._batch_size, self.K), dtype=tf.float32  )
 
@@ -855,12 +854,12 @@ class GravesAttention(_BaseAttentionMechanism):
       
       print(alpha_t.get_shape())
       # is sequence length of alpha_t the same as mu,sig?**********************
-      a = tf.slice( alpha_t, [0, 1], [self._batch_size, tf.get_shape(alpha_t)[1]-1] )
-      b = tf.slice( alpha_t, [0, 0], [self._batch_size, tf.get_shape(alpha_t)[1]-1] )
+      a = tf.slice( alpha_t, [0, 1], [self._batch_size, tf.shape(alpha_t)[1]-1] )
+      b = tf.slice( alpha_t, [0, 0], [self._batch_size, tf.shape(alpha_t)[1]-1] )
       alpha_t = a-b
       
       #replace 0 with 1e-8
-      alpha_t = tf.where( tf.equal( 0, alpha_t ), 1e-8 * tf.ones_like( alpha_t ), alpha_t )
+      alpha_t = tf.where( tf.equal( 0., alpha_t ), 1e-8 * tf.ones_like( alpha_t ), alpha_t )
       self.mu_prev = mu_t
       
       print(alpha_t.get_shape())

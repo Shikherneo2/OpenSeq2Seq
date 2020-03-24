@@ -257,8 +257,7 @@ class Tacotron2Decoder(Decoder):
                   memory = encoder_outputs,
                   memory_sequence_length=encoder_sequence_length,
                   probability_fn=tf.nn.softmax,
-                  batch_size=encoder_outputs.get_shape().as_list()[0],
-                  training=training
+                  training=(self._mode == "train")
                   )
       else:
         raise ValueError('Unknown Attention Type')
@@ -494,7 +493,9 @@ class Tacotron2Decoder(Decoder):
     if regularizer and training:
       vars_to_regularize = []
       vars_to_regularize += attentive_cell.trainable_variables
-      vars_to_regularize += attention_mechanism.memory_layer.trainable_variables
+      
+      if( attention_mechanism.memory_layer is not None ):
+        vars_to_regularize += attention_mechanism.memory_layer.trainable_variables
       vars_to_regularize += output_projection_layer.trainable_variables
       vars_to_regularize += stop_token_projection_layer.trainable_variables
 
