@@ -363,13 +363,10 @@ class Text2SpeechDataLayer(DataLayer):
             self.params['batch_size'], padded_shapes=([None], 1)
         )
 
-      self._iterator = self._dataset.prefetch(tf.contrib.data.AUTOTUNE)\
-                                    .make_initializable_iterator()
+      self._iterator = self._dataset.prefetch(tf.contrib.data.AUTOTUNE).make_initializable_iterator()
 
       if( self.params['mode'] != 'infer' or self.params.get("style_input", None) == "wav" ):
         text, text_length, spec, stop_token_target, spec_length = self._iterator.get_next()
-        # need to explicitly set batch size dimension
-        # (it is employed in the model)
         spec.set_shape(
             [self.params['batch_size'], None, num_audio_features]
         )
@@ -442,15 +439,8 @@ class Text2SpeechDataLayer(DataLayer):
           constant_values=self.params['char2idx']["<p>"]
       )
 
-    # Mainly used for GST
-    if "wavs" in audio_filename:
-      file_path = os.path.join(
-          self.params['dataset_location'], audio_filename + ".wav"
-      )
-    # Default path for LJ and MAILABS
-    else:
-      file_path = os.path.join(
-          self.params['dataset_location'], "wavs", audio_filename + ".wav"
+    file_path = os.path.join(
+          self.params['dataset_location'], "os2s_mels", audio_filename + ".npy"
       )
     if self._mel:
       features_type = "mel_htk"
@@ -462,30 +452,9 @@ class Text2SpeechDataLayer(DataLayer):
     if self.use_cache and audio_filename in self._cache:
       spectrogram = self._cache[audio_filename]
     else:
-      spectrogram = get_speech_features_from_file(
-          file_path,
-          self.params['num_audio_features'],
-          features_type=features_type,
-          n_fft=self._n_fft,
-          win_length=self.params.get( 'win_length', 1024 ),
-          hop_length=self.params.get( 'hop_length', 256 ),
-          mag_power=self.params.get('mag_power', 2),
-          feature_normalize=self.params["feature_normalize"],
-          mean=self.params.get("feature_normalize_mean", 0.),
-          std=self.params.get("feature_normalize_std", 1.),
-          trim=self.params.get("trim", False),
-          data_min=self.params.get("data_min", 1e-5),
-          mel_basis=self._mel_basis,
-          sampling_rate_param=self._sampling_rate
-      )
-
+      spectrogram = np.load( file_path  )
       if self.use_cache:
         self._cache[audio_filename] = spectrogram
-
-    if self._both:
-      mel_spectrogram, spectrogram = spectrogram
-      if self._exp_mag:
-        spectrogram = np.exp(spectrogram)
 
     stop_token_target = np.zeros(
         [len(spectrogram)], dtype=self.params['dtype'].as_numpy_dtype()
@@ -506,24 +475,7 @@ class Text2SpeechDataLayer(DataLayer):
           pad_value = self._normalize(pad_value)
           pad_value_mel = pad_value_mag = pad_value
 
-      if self._both:
-        mel_spectrogram = np.pad(
-            mel_spectrogram,
-            # ((8, num_pad), (0, 0)),
-            ((0, num_pad), (0, 0)),
-            "constant",
-            constant_values=pad_value_mel
-        )
-        spectrogram = np.pad(
-            spectrogram,
-            # ((8, num_pad), (0, 0)),
-            ((0, num_pad), (0, 0)),
-            "constant",
-            constant_values=pad_value_mag
-        )
-        spectrogram = np.concatenate((mel_spectrogram, spectrogram), axis=1)
-      else:
-        spectrogram = np.pad(
+      spectrogram = np.pad(
             spectrogram,
             # ((8, num_pad), (0, 0)),
             ((0, num_pad), (0, 0)),
