@@ -4,23 +4,36 @@ import librosa
 import numpy as np
 import librosa.filters
 
-input_dir = sys.argv[1]
+input_arg = sys.argv[1]
 output_dir = sys.argv[2]
+
+wav_location = "/home/sdevgupta/mine/Blizzard2013_Segmentation/segments"
+
+if os.path.isdir(input_arg):
+    input_dir = input_arg
+    filenames = [ os.path.join(input_dir, i) for i in os.listdir(input_dir)  ]
+else:
+    f = open(input_arg).read()
+    lines = f.split("\n")
+    lines = [ i.strip() for i in lines if i.strip()!=""  ]
+    files = [ line.split("|")[0].strip() for line in lines ]
+    files = ["/".join( i.split("/")[-2:] )+".wav" for i in files  ]
+    filenames = [ os.path.join(wav_location, i) for i in files  ]
 
 def get_speech_features_from_file(
 		filename,
 		num_features,
 		n_fft=1024,
-		hop_length=None,
-		win_length=None,
-		mag_power=2,
+		hop_length=256,
+		win_length=1024,
+		mag_power=1,
 		feature_normalize=False,
 		mean=0.,
 		std=1.,
 		trim=False,
 		data_min=1e-5,
 		mel_basis=None,
-		sampling_rate_param=16000
+		sampling_rate_param=22050
 ):
 	""" Helper function to retrieve spectrograms from wav files
 
@@ -48,8 +61,6 @@ def get_speech_features_from_file(
 	if win_length is None:
 		win_length = n_fft
 	signal, fs = librosa.core.load(filename, sr=sampling_rate_param)
-	print("Signal")
-	print(signal[800:820])
 	if hop_length is None:
 		hop_length = int(n_fft / 4)
 	if trim:
@@ -73,7 +84,7 @@ def get_speech_features(
 		n_fft=1024,
 		hop_length_param=256,
 		win_length_param=1024,
-		mag_power=2,
+		mag_power=1,
 		feature_normalize=False,
 		mean=0.,
 		std=1.,
@@ -107,9 +118,6 @@ def get_speech_features(
 	complex_spec = librosa.stft( y=signal, n_fft=n_fft, hop_length=hop_length_param, win_length=win_length_param )
 	mag, _ = librosa.magphase( complex_spec, power=mag_power )
 
-	print("Mag")
-	print(mag.shape)
-	print(mag[300][200:220])
 	if mel_basis is None:
 		htk = True
 		norm = None
@@ -122,31 +130,24 @@ def get_speech_features(
 			norm=norm
 		)
 		
-	print("mel_basis")
-	print(mel_basis.shape)
-	print(np.mean(mel_basis))
 	features = np.dot(mel_basis, mag)
-	print("features before log and clamp")
-	print(features[20][250:260])
 	features = np.log(np.clip(features, a_min=data_min, a_max=8000))
-	print("Final features before transpose")
-	print(features[20][250:260])
-	return features.T
+	return features
 
-for file in os.listdir(input_dir ):
+for file in filenames:
 	if( file.split(".")[-1] =="wav" ):
-		mel = get_speech_features_from_file(  os.path.join(input_dir, file),
-										num_features=80,
-										n_fft=800,
-										hop_length=200,
-										win_length=800,
-										mag_power=2,
-										feature_normalize=False,
-										mean=0.,
-										std=1.,
-										trim=False,
-										data_min=0,
-										mel_basis=None,
-										sampling_rate_param=16000 )
-		print( mel.shape )
-		# np.save( os.path.join(output_dir, file.replace("wav","npy")), mel )
+		mel = get_speech_features_from_file(  file,
+                                                                        num_features=80,
+                                                                        n_fft=1024,
+                                                                        hop_length=256,
+                                                                        win_length=1024,
+                                                                        mag_power=1,
+                                                                        feature_normalize=False,
+                                                                        mean=0.,
+                                                                        std=1.,
+                                                                        trim=False,
+                                                                        data_min=1e-5,
+                                                                        mel_basis=None,
+                                                                        sampling_rate_param=22050 )
+		output_filename = "_".join( file.split("/")[-2:] ).replace(".wav",".npy")
+		np.save( os.path.join(output_dir, output_filename), mel )
