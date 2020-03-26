@@ -12,7 +12,7 @@ from open_seq2seq.optimizers.lr_policies import fixed_lr, transformer_policy, ex
 base_model = Text2SpeechTacotron
 
 dataset = "LJ"
-dataset_location = "/mydata/"
+dataset_location = "/home/sdevgupta/mine/OpenSeq2Seq/dataset/"
 output_type = "both"
 
 if dataset == "MAILABS":
@@ -20,7 +20,7 @@ if dataset == "MAILABS":
   mag_num_feats = 401
   train = "train.csv"
   val = "val.csv"
-  batch_size = 32
+  batch_size = 1
   n_fft=800
   sampling_rate=16000
   win_length=None #defaults to n_fft
@@ -31,7 +31,7 @@ elif dataset == "LJ":
   mag_num_feats = 513
   train = "train_32.csv"
   val = "val.csv"
-  batch_size = 60
+  batch_size = 1
   n_fft=1024
   sampling_rate=22050
   win_length=1024 #defaults to n_fft
@@ -61,11 +61,11 @@ else:
   raise ValueError("Unknown param for output_type")
 
 base_params = {
-  "win_length": win_length,
-	"hop_length": hop_length,
+#  "win_length": win_length,
+#	"hop_length": hop_length,
 	"random_seed": 0,
-  "use_horovod": True,
-  "num_gpus": 8,
+  "use_horovod": False,
+  "num_gpus": 1,
   "num_epochs": 500,
 
   "batch_size_per_gpu": batch_size,
@@ -76,7 +76,7 @@ base_params = {
   "eval_steps": 1000,
   "save_checkpoint_steps": 1000,
   "save_to_tensorboard": True,
-  "logdir": "/mydata/new_results",
+  "logdir": "/home/sdevgupta/mine/OpenSeq2Seq/logs_gmm_attention",
   "max_grad_norm":1.,
 
   "optimizer": "Adam",
@@ -167,7 +167,7 @@ base_params = {
       "emb_size": 512,
       'attention_layer_size': 512,
       "num_tokens": 32,
-      "num_heads": 0
+      "num_heads": 8
     }
   },
 
@@ -272,7 +272,9 @@ eval_params = {
 
 infer_params = {
   "data_layer_params": {
-    "dataset_files": ["generate.csv"],
+    "dataset_files": [
+        os.path.join(dataset_location, "generate.csv")
+        ],
     "duration_max":10000,
     "duration_min":0,
     "shuffle": False,

@@ -97,3 +97,5 @@ logs*/
 dataset/
 *.gz
 *.pickle
+testing_config.py
+*.csv

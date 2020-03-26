@@ -425,7 +425,6 @@ class Tacotron2Decoder(Decoder):
       maximum_iterations = tf.reduce_max(enc_src_lengths) * 10
 
     outputs, final_state, sequence_lengths = tf.contrib.seq2seq.dynamic_decode(
-        # outputs, final_state, sequence_lengths, final_inputs = dynamic_decode(
         decoder=decoder,
         impute_finished=False,
         maximum_iterations=maximum_iterations,

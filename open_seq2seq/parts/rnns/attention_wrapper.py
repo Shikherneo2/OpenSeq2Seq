@@ -824,36 +824,28 @@ class GravesAttention(_BaseAttentionMechanism):
 
 
   def __call__(self, query, state):
-      # expanded_alignments = array_ops.expand_dims(state, 1)
-      # context = math_ops.matmul(expanded_alignments, self.values)
       seq_length = self.seq_len
 
       gbk_t = self.N_a( query )
-
-      print("Mu, vars:")
-      print(gbk_t.get_shape())
 
       g_t = tf.slice(gbk_t, [0, 0], [self._batch_size, self.K] )
       b_t = tf.slice(gbk_t, [0, 1], [self._batch_size, self.K] )
       k_t = tf.slice(gbk_t, [0, 2], [self._batch_size, self.K] )
 
       g_t = tf.layers.dropout( g_t, rate=0.5, training=self.training )
-
       sig_t = tf.math.softplus(b_t) + self.eps
+      
       mu_t = self.mu_prev + tf.math.softplus(k_t)
+      
       g_t = tf.nn.softmax( g_t, axis=-1) + self.eps
 
       j = tf.slice( self.J, [0], [ self.seq_len+1 ] )
 
-      # attention_weights
       temp = 1 + tf.nn.sigmoid( (tf.expand_dims(mu_t, -1) - j)/ tf.expand_dims(sig_t, -1) )
       phi_t = tf.expand_dims(g_t, -1) * (1/temp)
-
       # discretize
-      alpha_t = tf.squeeze( tf.reduce_sum( phi_t, 1 ) )
+      alpha_t = tf.reduce_sum( phi_t, 1 )
       
-      print(alpha_t.get_shape())
-      # is sequence length of alpha_t the same as mu,sig?**********************
       a = tf.slice( alpha_t, [0, 1], [self._batch_size, tf.shape(alpha_t)[1]-1] )
       b = tf.slice( alpha_t, [0, 0], [self._batch_size, tf.shape(alpha_t)[1]-1] )
       alpha_t = a-b
@@ -867,7 +859,6 @@ class GravesAttention(_BaseAttentionMechanism):
         next_state = alpha_t + state
       else:
         next_state = alpha_t
-      #ret = tf.matmul( alpha_t, query  )
       return alpha_t, next_state
 
 

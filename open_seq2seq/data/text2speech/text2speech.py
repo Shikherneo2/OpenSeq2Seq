@@ -439,7 +439,7 @@ class Text2SpeechDataLayer(DataLayer):
           constant_values=self.params['char2idx']["<p>"]
       )
 
-    file_path = os.path.join( "/home/kiwiuser/sgupta/unet/data/mels_ground_truth", "_".join( audio_filename.split("/")[-2:] ) + ".npy" )
+    file_path = os.path.join( "/home/sdevgupta/mine/data/mels_ground_truth", "_".join( audio_filename.split("/")[-1:] ) + ".npy" )
     if self._mel:
       features_type = "mel_htk"
       if self.params.get('mel_type', 'htk') == 'slaney':
@@ -450,7 +450,7 @@ class Text2SpeechDataLayer(DataLayer):
     if self.use_cache and audio_filename in self._cache:
       spectrogram = self._cache[audio_filename]
     else:
-      spectrogram = np.load( file_path  )
+      spectrogram = np.load( file_path  ).T
       if self.use_cache:
         self._cache[audio_filename] = spectrogram
 
