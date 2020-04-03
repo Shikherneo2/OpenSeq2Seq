@@ -817,10 +817,13 @@ class GravesAttention(_BaseAttentionMechanism):
     self.seq_len = self._alignments_size
     self.J = tf.cast( tf.range( self.seq_len + 2 ), dtype=tf.float32) + 0.5
 
+  def initial_state(self, batch_size, dtype):
+    return _zero_state_tensors(self.K, batch_size, dtype)
+
   def __call__(self, query, state):
     seq_length = self.seq_len
     mu_prev = state
-    
+
     with variable_scope.variable_scope(None, "location_attention", [query]):
       gbk_t = self.dense_layer( query )
 
