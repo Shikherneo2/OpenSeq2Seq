@@ -160,12 +160,8 @@ def _maybe_mask_score(score, memory_sequence_length, score_mask_value):
   if memory_sequence_length is None:
     return score
   message = ("All values in memory_sequence_length must greater than zero.")
-  with ops.control_dependencies(
-      [check_ops.assert_positive(memory_sequence_length, message=message)]
-  ):
-    score_mask = array_ops.sequence_mask(
-        memory_sequence_length, maxlen=array_ops.shape(score)[1]
-    )
+  with ops.control_dependencies( [check_ops.assert_positive(memory_sequence_length, message=message) ] ):
+    score_mask = array_ops.sequence_mask( memory_sequence_length, maxlen=array_ops.shape(score)[1] )
     score_mask_values = score_mask_value * array_ops.ones_like(score)
     return array_ops.where(score_mask, score, score_mask_values)
 
@@ -802,64 +798,55 @@ class GravesAttention(_BaseAttentionMechanism):
         name=name
     )
     self.training = training
+    with tf.name_scope(name, 'GmmAttentionMechanismInit'):
+      self._mask_value = 1e-8
+      self.maybe_mask_score = lambda x: _maybe_mask_score(x, memory_sequence_length, self._mask_value)
     self.eps = 1e-5
-    # Add names to the dense layer??
     # Number of gaussians in the mixture
-    self.K = 5
+    self.K = 10
 
     # Mimicking pytorch's default bias initializer
     m = math.sqrt(1.0/self.K)
     bias_random_init = np.random.uniform( -m, m, self.K)
     # zeros, 1-mean, 10-std
     bias_init = tf.constant_initializer( np.hstack([bias_random_init, np.ones(self.K), np.full(self.K, 10)]) ) 
-    layer1 = tf.layers.Dense( units=num_units, activation="relu" ) # from query to query
-    layer2 = tf.layers.Dense( units=3*self.K, bias_initializer=bias_init )
+    layer1 = tf.layers.Dense( units=num_units, activation="relu", name="graves_attention_denselayer1" )
+    layer2 = tf.layers.Dense( units=3*self.K, bias_initializer=bias_init, name="graves_attention_denselayer2" )
     
-    self.N_a = lambda x: layer2(layer1(x))
-
+    self.dense_layer = lambda x: layer2(layer1(x))
     self.seq_len = self._alignments_size
-    self._use_coverage = use_coverage
     self.J = tf.cast( tf.range( self.seq_len + 2 ), dtype=tf.float32) + 0.5
-    self.mu_prev = tf.constant( 0, shape=(self._batch_size, self.K), dtype=tf.float32  )
-
 
   def __call__(self, query, state):
-      seq_length = self.seq_len
+    seq_length = self.seq_len
 
-      gbk_t = self.N_a( query )
+    with variable_scope.variable_scope(None, "location_attention", [query]):
+      gbk_t = self.dense_layer( query )
 
-      g_t = tf.slice(gbk_t, [0, 0], [self._batch_size, self.K] )
-      b_t = tf.slice(gbk_t, [0, 1], [self._batch_size, self.K] )
-      k_t = tf.slice(gbk_t, [0, 2], [self._batch_size, self.K] )
+      g_t, b_t, k_t = tf.split( gbk_t, num_or_size_splits=3, axis=1 )
 
       g_t = tf.layers.dropout( g_t, rate=0.5, training=self.training )
       sig_t = tf.math.softplus(b_t) + self.eps
       
       mu_t = self.mu_prev + tf.math.softplus(k_t)
       
-      g_t = tf.nn.softmax( g_t, axis=-1) + self.eps
+      g_t = tf.nn.softmax( g_t, axis=1) + self.eps
 
-      j = tf.slice( self.J, [0], [ self.seq_len+1 ] )
+      j = tf.slice( self.J, [0], [ seq_length+1 ] )
 
-      temp = 1 + tf.nn.sigmoid( (tf.expand_dims(mu_t, -1) - j)/ tf.expand_dims(sig_t, -1) )
-      phi_t = tf.expand_dims(g_t, -1) * (1/temp)
+      phi_t = tf.expand_dims(g_t, -1) * tf.nn.sigmoid( (j-tf.expand_dims(mu_t, -1))/ tf.expand_dims(sig_t, -1) )
       # discretize
       alpha_t = tf.reduce_sum( phi_t, 1 )
       
-      a = tf.slice( alpha_t, [0, 1], [self._batch_size, tf.shape(alpha_t)[1]-1] )
-      b = tf.slice( alpha_t, [0, 0], [self._batch_size, tf.shape(alpha_t)[1]-1] )
+      a = tf.slice( alpha_t, [0, 1], [self._batch_size, seq_length] )
+      b = tf.slice( alpha_t, [0, 0], [self._batch_size, seq_length] )
       alpha_t = a-b
       
       #replace 0 with 1e-8
-      alpha_t = tf.where( tf.equal( 0., alpha_t ), 1e-8 * tf.ones_like( alpha_t ), alpha_t )
-      self.mu_prev = mu_t
-      
-      print(alpha_t.get_shape())
-      if self._use_coverage:
-        next_state = alpha_t + state
-      else:
-        next_state = alpha_t
-      return alpha_t, next_state
+      # alpha_t = tf.where( tf.equal( 0., alpha_t ), 1e-8 * tf.ones_like( alpha_t ), alpha_t )
+      alpha_t = self.maybe_mask_score(alpha_t)
+    next_state = mu_t 
+    return alpha_t, next_state
 
 
 
@@ -924,6 +911,7 @@ class LocationSensitiveAttention(_BaseAttentionMechanism):
     if dtype is None:
       dtype = dtypes.float32
     wrapped_probability_fn = lambda score, _: probability_fn(score)
+    
     super(LocationSensitiveAttention, self).__init__(
         query_layer=layers_core.Dense(
             num_units, name="query_layer", use_bias=False, dtype=dtype
@@ -957,8 +945,8 @@ class LocationSensitiveAttention(_BaseAttentionMechanism):
         kernel_size = location_attention_params["kernel_size"]
         filters = location_attention_params["filters"]
 
-      self.location_layer = ChorowskiLocationLayer(
-          filters, kernel_size, num_units)
+      self.location_layer = ChorowskiLocationLayer( filters, kernel_size, num_units )
+    
     elif location_attn_type == "zhaopeng":
       self.location_layer = ZhaopengLocationLayer(num_units, query_dim)
       self._use_coverage = True
