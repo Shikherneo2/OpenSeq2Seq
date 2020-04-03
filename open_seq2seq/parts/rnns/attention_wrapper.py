@@ -819,7 +819,8 @@ class GravesAttention(_BaseAttentionMechanism):
 
   def __call__(self, query, state):
     seq_length = self.seq_len
-
+    mu_prev = state
+    
     with variable_scope.variable_scope(None, "location_attention", [query]):
       gbk_t = self.dense_layer( query )
 
@@ -828,7 +829,7 @@ class GravesAttention(_BaseAttentionMechanism):
       g_t = tf.layers.dropout( g_t, rate=0.5, training=self.training )
       sig_t = tf.math.softplus(b_t) + self.eps
       
-      mu_t = self.mu_prev + tf.math.softplus(k_t)
+      mu_t = mu_prev + tf.math.softplus(k_t)
       
       g_t = tf.nn.softmax( g_t, axis=1) + self.eps
 
