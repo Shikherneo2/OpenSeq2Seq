@@ -1,3 +1,4 @@
+
 # pylint: skip-file
 # Copyright 2017 The TensorFlow Authors. All Rights Reserved.
 #
@@ -761,12 +762,8 @@ class ZhaopengLocationLayer(layers_base.Layer):
 
 
 class GravesAttention(_BaseAttentionMechanism):
-  """Implements Graves-style (additive) GMM based attention mechanism. Ported to tensorflow from pytorch code by Mozilla TTS.
-  https://github.com/mozilla/TTS/blob/dev/layers/common_layers.py#L147
-
-  The implementation is described in:
-
-  arxiv paper link
+  """ Implements Graves-style (additive) GMM based attention mechanism. Ported to tensorflow from pytorch code by Mozilla TTS.
+      https://github.com/mozilla/TTS/blob/dev/layers/common_layers.py#L147
   """
   
   def __init__(
@@ -786,36 +783,37 @@ class GravesAttention(_BaseAttentionMechanism):
       name="GravesAttention"
   ):
     
-    
     wrapped_probability_fn = lambda score, _: probability_fn(score)
     super(GravesAttention, self).__init__(
-        query_layer=None,
+        query_layer = None,
         memory_layer = None,
-        memory=memory,
-        probability_fn=wrapped_probability_fn,
-        memory_sequence_length=memory_sequence_length,
-        score_mask_value=None,
+        memory = memory,
+        probability_fn = wrapped_probability_fn,
+        memory_sequence_length = memory_sequence_length,
+        score_mask_value = None,
         name=name
     )
     self.training = training
+    
     with tf.name_scope(name, 'GmmAttentionMechanismInit'):
       self._mask_value = 1e-8
       self.maybe_mask_score = lambda x: _maybe_mask_score(x, memory_sequence_length, self._mask_value)
-    self.eps = 1e-5
+    
     # Number of gaussians in the mixture
     self.K = 10
+    self.eps = 1e-5
 
     # Mimicking pytorch's default bias initializer
     m = math.sqrt(1.0/self.K)
     bias_random_init = np.random.uniform( -m, m, self.K)
     # zeros, 1-mean, 10-std
     bias_init = tf.constant_initializer( np.hstack([bias_random_init, np.ones(self.K), np.full(self.K, 10)]) ) 
-    layer1 = tf.layers.Dense( units=num_units, activation="relu", name="graves_attention_denselayer1" )
-    layer2 = tf.layers.Dense( units=3*self.K, bias_initializer=bias_init, name="graves_attention_denselayer2" )
+    layer1 = tf.layers.Dense( units=num_units, activation="relu", name="graves_attention_denselayer1", trainable=True, dtype=dtype )
+    layer2 = tf.layers.Dense( units=3*self.K, bias_initializer=bias_init, name="graves_attention_denselayer2", trainable=True, dtype=dtype )
     
     self.dense_layer = lambda x: layer2(layer1(x))
     self.seq_len = self._alignments_size
-    self.J = tf.cast( tf.range( self.seq_len + 2 ), dtype=tf.float32) + 0.5
+    self.J = tf.cast( tf.range( self.seq_len + 2 ), dtype=dtype) + 0.5
 
   def initial_state(self, batch_size, dtype):
     return _zero_state_tensors(self.K, batch_size, dtype)
@@ -824,31 +822,41 @@ class GravesAttention(_BaseAttentionMechanism):
     seq_length = self.seq_len
     mu_prev = state
 
-    with variable_scope.variable_scope(None, "location_attention", [query]):
+    mu_prev = tf.Print( mu_prev, [mu_prev[0]], "Previous state" )
+    with variable_scope.variable_scope(None, "graves_attention", [query]):
       gbk_t = self.dense_layer( query )
 
       g_t, b_t, k_t = tf.split( gbk_t, num_or_size_splits=3, axis=1 )
+
+      k_t = tf.Print( k_t, [k_t[0]], "Current mu cap" )
 
       g_t = tf.layers.dropout( g_t, rate=0.5, training=self.training )
       sig_t = tf.math.softplus(b_t) + self.eps
       
       mu_t = mu_prev + tf.math.softplus(k_t)
       
+      mu_t = tf.Print( mu_t, [mu_t[0]], "Current mu" )
+
       g_t = tf.nn.softmax( g_t, axis=1) + self.eps
+
+      g_t = tf.Print( g_t, [g_t[0]], "Softmax over mixtures" )
 
       j = tf.slice( self.J, [0], [ seq_length+1 ] )
 
+      j = tf.Print( j, [seq_length, j], "Sequence length" )
+
       phi_t = tf.expand_dims(g_t, -1) * tf.nn.sigmoid( (j-tf.expand_dims(mu_t, -1))/ tf.expand_dims(sig_t, -1) )
-      # discretize
       alpha_t = tf.reduce_sum( phi_t, 1 )
-      
+      alpha_t = tf.Print( alpha_t, [alpha_t[0]], "Alpha t" )
+      # discretize
       a = tf.slice( alpha_t, [0, 1], [self._batch_size, seq_length] )
       b = tf.slice( alpha_t, [0, 0], [self._batch_size, seq_length] )
       alpha_t = a-b
-      
+      alpha_t = tf.Print( alpha_t, [alpha_t[0]], "Alpha t discretize" )
       #replace 0 with 1e-8
       # alpha_t = tf.where( tf.equal( 0., alpha_t ), 1e-8 * tf.ones_like( alpha_t ), alpha_t )
       alpha_t = self.maybe_mask_score(alpha_t)
+      alpha_t = tf.Print( alpha_t, [alpha_t[0]], "Alpha t discretized masked" )
     next_state = mu_t 
     return alpha_t, next_state
 
@@ -1585,16 +1593,18 @@ class AttentionWrapper(rnn_cell_impl.RNNCell):
         time major `TensorArray` on which you must call `stack()`).
       cell_input_fn: (optional) A `callable`.  The default is:
         `lambda inputs, attention: array_ops.concat([inputs, attention], -1)`.
+
       output_attention: bool or "both".  If `True` (default), the output at each
         time step is the attention value.  This is the behavior of Luong-style
         attention mechanisms.  If `False`, the output at each time step is
-        the output of `cell`.  This is the beahvior of Bhadanau-style
+        the output of `cell`.  This is the behavior of Bahdanau-style
         attention mechanisms.  If "both", the attention value and cell output
         are concatenated together and set as the output. In all cases, the
         `attention` tensor is propagated to the next time step via the state and
         is used there. This flag only controls whether the attention mechanism
         is propagated up to the next cell in an RNN stack or to the top RNN
         output.
+      
       initial_cell_state: The initial state value to use for the cell when
         the user calls `zero_state()`.  Note that if this value is provided
         now, and the user uses a `batch_size` argument of `zero_state` which
@@ -1674,6 +1684,7 @@ class AttentionWrapper(rnn_cell_impl.RNNCell):
     self._cell_input_fn = cell_input_fn
     self._output_attention = output_attention
     self._alignment_history = alignment_history
+
     with ops.name_scope(name, "AttentionWrapperInit"):
       if initial_cell_state is None:
         self._initial_cell_state = None
@@ -1862,6 +1873,8 @@ class AttentionWrapper(rnn_cell_impl.RNNCell):
 
     # Step 1: Calculate the true inputs to the cell based on the
     # previous attention value.
+
+    # IS THIS CORRECT?? STATE.ATTENTION IS WHAT??*****************************************
     cell_inputs = self._cell_input_fn(inputs, state.attention)
     cell_state = state.cell_state
     cell_output, next_cell_state = self._cell(cell_inputs, cell_state)
@@ -1893,6 +1906,7 @@ class AttentionWrapper(rnn_cell_impl.RNNCell):
     all_attentions = []
     all_attention_states = []
     maybe_all_histories = []
+
     for i, attention_mechanism in enumerate(self._attention_mechanisms):
       attention, alignments, next_attention_state = _compute_attention(
           attention_mechanism, cell_output, previous_attention_state[i],

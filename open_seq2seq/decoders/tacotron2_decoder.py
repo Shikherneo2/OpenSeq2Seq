@@ -257,7 +257,8 @@ class Tacotron2Decoder(Decoder):
                   memory = encoder_outputs,
                   memory_sequence_length=encoder_sequence_length,
                   probability_fn=tf.nn.softmax,
-                  training=(self._mode == "train")
+                  training=(self._mode == "train"),
+                  dtype=tf.get_variable_scope().dtype,
                   )
       else:
         raise ValueError('Unknown Attention Type')
@@ -366,9 +367,10 @@ class Tacotron2Decoder(Decoder):
 
     if self.params['attention_type'] is not None:
       attention_mechanism = self._build_attention(
-          encoder_outputs, enc_src_lengths,
-          self.params.get("attention_bias", False)
-      )
+                                encoder_outputs, 
+                                enc_src_lengths,
+                                self.params.get("attention_bias", False)
+                            )
 
       attention_cell = tf.contrib.rnn.MultiRNNCell(decoder_cells)
 

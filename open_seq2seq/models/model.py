@@ -511,12 +511,10 @@ class Model:
                 self.skip_update_ph = tf.placeholder(tf.bool)
 
             var_list = tf.trainable_variables()
-            freeze_variables_regex = self.params.get(
-                'freeze_variables_regex', None)
+            freeze_variables_regex = self.params.get( 'freeze_variables_regex', None )
             if freeze_variables_regex is not None:
                 pattern = re.compile(freeze_variables_regex)
-                var_list = [var for var in tf.trainable_variables()
-                            if not pattern.match(var.name)]
+                var_list = [ var for var in tf.trainable_variables() if not pattern.match(var.name) ]
 
             self.train_op = optimize_loss(
                 loss=tf.cast(self.loss, tf.float32) +
@@ -541,8 +539,7 @@ class Model:
             if self.steps_in_epoch:
                 tf.summary.scalar(
                     name="epoch",
-                    tensor=tf.floor(tf.train.get_global_step(
-                    ) / tf.constant(self.steps_in_epoch, dtype=tf.int64)),
+                    tensor=tf.floor(tf.train.get_global_step() / tf.constant(self.steps_in_epoch, dtype=tf.int64)),
                 )
 
             if not self.on_horovod or self._hvd.rank() == 0:
