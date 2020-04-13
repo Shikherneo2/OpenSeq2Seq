@@ -828,35 +828,35 @@ class GravesAttention(_BaseAttentionMechanism):
 
       g_t, b_t, k_t = tf.split( gbk_t, num_or_size_splits=3, axis=1 )
 
-      k_t = tf.Print( k_t, [k_t[0]], "Current mu cap" )
+      k_t = tf.Print( k_t, [k_t[0][0]], "Mu-cap" )
 
       g_t = tf.layers.dropout( g_t, rate=0.5, training=self.training )
+      
       sig_t = tf.math.softplus(b_t) + self.eps
-      
+      sig_t = tf.Print( sig_t, [sig_t[0]], "Sigma" )
+
       mu_t = mu_prev + tf.math.softplus(k_t)
-      
-      mu_t = tf.Print( mu_t, [mu_t[0]], "Current mu" )
+      mu_t = tf.Print( mu_t, [mu_t[0]], "Mu" )
 
       g_t = tf.nn.softmax( g_t, axis=1) + self.eps
-
-      g_t = tf.Print( g_t, [g_t[0]], "Softmax over mixtures" )
+      g_t = tf.Print( g_t, [g_t[0]], "Softmax" )
 
       j = tf.slice( self.J, [0], [ seq_length+1 ] )
-
       j = tf.Print( j, [seq_length, j], "Sequence length" )
 
       phi_t = tf.expand_dims(g_t, -1) * tf.nn.sigmoid( (j-tf.expand_dims(mu_t, -1))/ tf.expand_dims(sig_t, -1) )
       alpha_t = tf.reduce_sum( phi_t, 1 )
-      alpha_t = tf.Print( alpha_t, [alpha_t[0]], "Alpha t" )
+      alpha_t = tf.Print( alpha_t, [alpha_t[0]], "Alpha" )
+
       # discretize
       a = tf.slice( alpha_t, [0, 1], [self._batch_size, seq_length] )
       b = tf.slice( alpha_t, [0, 0], [self._batch_size, seq_length] )
       alpha_t = a-b
-      alpha_t = tf.Print( alpha_t, [alpha_t[0]], "Alpha t discretize" )
+      alpha_t = tf.Print( alpha_t, [alpha_t[0]], "alpha-disc" )
       #replace 0 with 1e-8
       # alpha_t = tf.where( tf.equal( 0., alpha_t ), 1e-8 * tf.ones_like( alpha_t ), alpha_t )
       alpha_t = self.maybe_mask_score(alpha_t)
-      alpha_t = tf.Print( alpha_t, [alpha_t[0]], "Alpha t discretized masked" )
+      alpha_t = tf.Print( alpha_t, [alpha_t[0]], "Masked" )
     next_state = mu_t 
     return alpha_t, next_state
 
