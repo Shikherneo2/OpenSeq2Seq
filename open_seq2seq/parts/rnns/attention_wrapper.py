@@ -804,10 +804,10 @@ class GravesAttention(_BaseAttentionMechanism):
     self.eps = 1e-5
 
     # Mimicking pytorch's default bias initializer
-    m = math.sqrt(1.0/self.K)
-    bias_random_init = np.random.uniform( -m, m, self.K)
+    #m = math.sqrt(1.0/self.K)
+    #bias_random_init = np.random.uniform( -m, m, self.K)
     # zeros, 1-mean, 10-std
-    bias_init = tf.constant_initializer( np.hstack([bias_random_init, np.ones(self.K), np.full(self.K, 10)]) ) 
+    bias_init = tf.constant_initializer( np.hstack([np.zeros(self.K), np.full(self.K, 10), np.ones(self.K)]) ) 
     layer1 = tf.layers.Dense( units=num_units, activation="relu", name="graves_attention_denselayer1", trainable=True, dtype=dtype )
     layer2 = tf.layers.Dense( units=3*self.K, bias_initializer=bias_init, name="graves_attention_denselayer2", trainable=True, dtype=dtype )
     
@@ -838,13 +838,15 @@ class GravesAttention(_BaseAttentionMechanism):
       mu_t = mu_prev + tf.math.softplus(k_t)
       mu_t = tf.Print( mu_t, [mu_t[0]], "Mu" )
 
-      g_t = tf.nn.softmax( g_t, axis=1) + self.eps
+      g_t = tf.nn.softmax( g_t, axis=1 ) + self.eps
       g_t = tf.Print( g_t, [g_t[0]], "Softmax" )
 
       j = tf.slice( self.J, [0], [ seq_length+1 ] )
       j = tf.Print( j, [seq_length, j], "Sequence length" )
 
-      phi_t = tf.expand_dims(g_t, -1) * tf.nn.sigmoid( (j-tf.expand_dims(mu_t, -1))/ tf.expand_dims(sig_t, -1) )
+      X = (j-tf.expand_dims(mu_t, -1))/ tf.expand_dims(sig_t, -1)
+      phi_t = tf.expand_dims(g_t, -1) * tf.nn.sigmoid( x )
+      # phi_t = x/( tf.expand_dims(sig_t, -1)*x*x )
       alpha_t = tf.reduce_sum( phi_t, 1 )
       alpha_t = tf.Print( alpha_t, [alpha_t[0]], "Alpha" )
 
