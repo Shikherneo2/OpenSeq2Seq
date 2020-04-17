@@ -802,6 +802,7 @@ class GravesAttention(_BaseAttentionMechanism):
     # Number of gaussians in the mixture
     self.K = 10
     self.eps = 1e-5
+    self.print_logs = False
 
     # Mimicking pytorch's default bias initializer
     #m = math.sqrt(1.0/self.K)
@@ -822,43 +823,43 @@ class GravesAttention(_BaseAttentionMechanism):
     seq_length = self.seq_len
     mu_prev = state
 
-    mu_prev = tf.Print( mu_prev, [mu_prev[0]], "Previous state" )
     with variable_scope.variable_scope(None, "graves_attention", [query]):
       gbk_t = self.dense_layer( query )
 
       g_t, b_t, k_t = tf.split( gbk_t, num_or_size_splits=3, axis=1 )
 
-      k_t = tf.Print( k_t, [k_t[0][0]], "Mu-cap" )
-
       g_t = tf.layers.dropout( g_t, rate=0.5, training=self.training )
       
       sig_t = tf.math.softplus(b_t) + self.eps
-      sig_t = tf.Print( sig_t, [sig_t[0]], "Sigma" )
 
       mu_t = mu_prev + tf.math.softplus(k_t)
-      mu_t = tf.Print( mu_t, [mu_t[0]], "Mu" )
 
       g_t = tf.nn.softmax( g_t, axis=1 ) + self.eps
-      g_t = tf.Print( g_t, [g_t[0]], "Softmax" )
 
       j = tf.slice( self.J, [0], [ seq_length+1 ] )
-      j = tf.Print( j, [seq_length, j], "Sequence length" )
 
-      X = (j-tf.expand_dims(mu_t, -1))/ tf.expand_dims(sig_t, -1)
+      x = (j-tf.expand_dims(mu_t, -1))/ tf.expand_dims(sig_t, -1)
       phi_t = tf.expand_dims(g_t, -1) * tf.nn.sigmoid( x )
       # phi_t = x/( tf.expand_dims(sig_t, -1)*x*x )
       alpha_t = tf.reduce_sum( phi_t, 1 )
-      alpha_t = tf.Print( alpha_t, [alpha_t[0]], "Alpha" )
 
       # discretize
       a = tf.slice( alpha_t, [0, 1], [self._batch_size, seq_length] )
       b = tf.slice( alpha_t, [0, 0], [self._batch_size, seq_length] )
       alpha_t = a-b
-      alpha_t = tf.Print( alpha_t, [alpha_t[0]], "alpha-disc" )
+      
       #replace 0 with 1e-8
       # alpha_t = tf.where( tf.equal( 0., alpha_t ), 1e-8 * tf.ones_like( alpha_t ), alpha_t )
+      if self.print_logs:
+        mu_prev = tf.Print( mu_prev, [mu_prev[0]], "Previous state" )
+        k_t = tf.Print( k_t, [k_t[0][0]], "Mu-cap" )
+        mu_t = tf.Print( mu_t, [mu_t[0]], "Mu" )
+        sig_t = tf.Print( sig_t, [sig_t[0]], "Sigma" )
+        g_t = tf.Print( g_t, [g_t[0]], "Softmax" )
+        alpha_t = tf.Print( alpha_t, [alpha_t[0]], "Alpha" )
+
       alpha_t = self.maybe_mask_score(alpha_t)
-      alpha_t = tf.Print( alpha_t, [alpha_t[0]], "Masked" )
+
     next_state = mu_t 
     return alpha_t, next_state
 
