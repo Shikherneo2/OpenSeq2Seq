@@ -785,21 +785,18 @@ class GravesAttention( _BaseAttentionMechanism ):
             memory = memory,
             probability_fn = wrapped_probability_fn,
             memory_sequence_length = memory_sequence_length,
-            score_mask_value = None,
+            score_mask_value = score_mask_value,
             name=name
         )
 
         self.dtype = dtype
         self.num_mixtures = 16
-        self.query_layer = tf.layers.Dense( 3 * self.num_mixtures, name='gmm_query_layer', use_bias=True, dtype=self.dtype, activation="relu" )
+        self.query_layer1 = tf.layers.Dense( 3 * self.num_mixtures, activation="relu", name='gmm_query_layer', use_bias=True, dtype=self.dtype )
 
         with tf.name_scope(name, 'GmmAttentionMechanismInit'):
             if score_mask_value is None:
-                score_mask_value = 0.
-            self._maybe_mask_score = partial(
-                attention_wrapper._maybe_mask_score,
-                memory_sequence_length=memory_sequence_length,
-                score_mask_value=score_mask_value)
+                maybe_mask_score = 1e-8
+            self.maybe_mask_score = lambda x: _maybe_mask_score(x, memory_sequence_length, maybe_mask_score)
 
     def initial_state(self, batch_size, dtype):
         state_size_ = self.num_mixtures
@@ -809,16 +806,17 @@ class GravesAttention( _BaseAttentionMechanism ):
         with tf.variable_scope("GmmAttention"):
             previous_kappa = state
             
-            params = self.query_layer(query)
+            params = self.query_layer1(query)
             alpha_hat, beta_hat, kappa_hat = tf.split(params, num_or_size_splits=3, axis=1)
 
             # [batch_size, num_mixtures, 1]
-            alpha = tf.expand_dims(tf.exp(alpha_hat), axis=2)
+            # alpha = tf.expand_dims( tf.math.softplus(alpha_hat), axis=2 )
             # softmax makes the alpha value more stable.
-            # alpha = tf.expand_dims(tf.nn.softmax(alpha_hat, axis=1), axis=2)
-            beta = tf.expand_dims(tf.exp(beta_hat), axis=2)
+            alpha = tf.expand_dims( tf.nn.softmax(alpha_hat, axis=1), axis=2 )
+
+            beta = tf.expand_dims( tf.math.softplus(beta_hat), axis=2 )
             
-            kappa = tf.expand_dims(previous_kappa + tf.exp(kappa_hat), axis=2)
+            kappa = tf.expand_dims(previous_kappa + tf.math.softplus(kappa_hat), axis=2)
 
             # [1, 1, max_input_steps]
             mu = tf.reshape( tf.cast(tf.range(self.alignments_size), dtype=tf.float32), shape=[1, 1, self.alignments_size] )
@@ -826,7 +824,7 @@ class GravesAttention( _BaseAttentionMechanism ):
             # [batch_size, max_input_steps]
             phi = tf.reduce_sum(alpha * tf.exp(-beta * (kappa - mu) ** 2.), axis=1)
 
-        alignments = self._maybe_mask_score(phi)
+        alignments = self.maybe_mask_score(phi)
         state = tf.squeeze(kappa, axis=2)
 
         return alignments, state
