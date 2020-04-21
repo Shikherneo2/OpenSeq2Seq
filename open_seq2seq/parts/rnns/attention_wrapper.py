@@ -761,8 +761,77 @@ class ZhaopengLocationLayer(layers_base.Layer):
     return location_attention
 
 
+class GravesAttention( _BaseAttentionMechanism ):
+    def __init__(
+                self,
+                num_units,
+                memory, #encoder_outputs
+                query_dim=None,
+                memory_sequence_length=None, #encoder_sequence_length
+                probability_fn=None, #tf.nn.softmax
+                score_mask_value=1e-8,
+                dtype=None,
+                use_bias=False,
+                use_coverage=True,
+                location_attn_type="chorowski",
+                location_attention_params=None,
+                training=True,
+                name="GravesAttention"):
 
-class GravesAttention(_BaseAttentionMechanism):
+        wrapped_probability_fn = lambda score, _: probability_fn(score)
+        super(GravesAttention, self).__init__(
+            query_layer = None,
+            memory_layer = None,
+            memory = memory,
+            probability_fn = wrapped_probability_fn,
+            memory_sequence_length = memory_sequence_length,
+            score_mask_value = None,
+            name=name
+        )
+
+        self.dtype = dtype
+        self.num_mixtures = 16
+        self.query_layer = tf.layers.Dense( 3 * self.num_mixtures, name='gmm_query_layer', use_bias=True, dtype=self.dtype, activation="relu" )
+
+        with tf.name_scope(name, 'GmmAttentionMechanismInit'):
+            if score_mask_value is None:
+                score_mask_value = 0.
+            self._maybe_mask_score = partial(
+                attention_wrapper._maybe_mask_score,
+                memory_sequence_length=memory_sequence_length,
+                score_mask_value=score_mask_value)
+
+    def initial_state(self, batch_size, dtype):
+        state_size_ = self.num_mixtures
+        return _zero_state_tensors(state_size_, batch_size, dtype)
+
+    def __call__(self, query, state):
+        with tf.variable_scope("GmmAttention"):
+            previous_kappa = state
+            
+            params = self.query_layer(query)
+            alpha_hat, beta_hat, kappa_hat = tf.split(params, num_or_size_splits=3, axis=1)
+
+            # [batch_size, num_mixtures, 1]
+            alpha = tf.expand_dims(tf.exp(alpha_hat), axis=2)
+            # softmax makes the alpha value more stable.
+            # alpha = tf.expand_dims(tf.nn.softmax(alpha_hat, axis=1), axis=2)
+            beta = tf.expand_dims(tf.exp(beta_hat), axis=2)
+            
+            kappa = tf.expand_dims(previous_kappa + tf.exp(kappa_hat), axis=2)
+
+            # [1, 1, max_input_steps]
+            mu = tf.reshape( tf.cast(tf.range(self.alignments_size), dtype=tf.float32), shape=[1, 1, self.alignments_size] )
+
+            # [batch_size, max_input_steps]
+            phi = tf.reduce_sum(alpha * tf.exp(-beta * (kappa - mu) ** 2.), axis=1)
+
+        alignments = self._maybe_mask_score(phi)
+        state = tf.squeeze(kappa, axis=2)
+
+        return alignments, state
+
+class GravesAttentionOld(_BaseAttentionMechanism):
   """ Implements Graves-style (additive) GMM based attention mechanism. Ported to tensorflow from pytorch code by Mozilla TTS.
       https://github.com/mozilla/TTS/blob/dev/layers/common_layers.py#L147
   """
@@ -783,7 +852,7 @@ class GravesAttention(_BaseAttentionMechanism):
       training=True,
       name="GravesAttention"
   ):
-    
+
     wrapped_probability_fn = lambda score, _: probability_fn(score)
     super(GravesAttention, self).__init__(
         query_layer = None,
