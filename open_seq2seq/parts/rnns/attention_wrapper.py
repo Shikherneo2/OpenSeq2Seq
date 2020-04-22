@@ -790,13 +790,15 @@ class GravesAttention( _BaseAttentionMechanism ):
         )
 
         self.dtype = dtype
-        self.num_mixtures = 16
+        self.eps = 1e-7
+        self.num_mixtures = 10
+        # 0.55, 
         self.query_layer1 = tf.layers.Dense( 3 * self.num_mixtures, activation="relu", name='gmm_query_layer', use_bias=True, dtype=self.dtype )
 
         with tf.name_scope(name, 'GmmAttentionMechanismInit'):
             if score_mask_value is None:
-                maybe_mask_score = 1e-8
-            self.maybe_mask_score = lambda x: _maybe_mask_score(x, memory_sequence_length, maybe_mask_score)
+                score_mask_value = 1e-8
+            self.maybe_mask_score = lambda x: _maybe_mask_score(x, memory_sequence_length, score_mask_value)
 
     def initial_state(self, batch_size, dtype):
         state_size_ = self.num_mixtures
@@ -807,14 +809,15 @@ class GravesAttention( _BaseAttentionMechanism ):
             previous_kappa = state
             
             params = self.query_layer1(query)
-            alpha_hat, beta_hat, kappa_hat = tf.split(params, num_or_size_splits=3, axis=1)
+            alpha_hat, beta_hat, kappa_hat = tf.split(paramcs, num_or_size_splits=3, axis=1)
 
             # [batch_size, num_mixtures, 1]
             # alpha = tf.expand_dims( tf.math.softplus(alpha_hat), axis=2 )
             # softmax makes the alpha value more stable.
-            alpha = tf.expand_dims( tf.nn.softmax(alpha_hat, axis=1), axis=2 )
+            alpha_hat = tf.layers.dropout( alpha_hat, rate=0.65, training=self.training )
+            alpha = tf.expand_dims( tf.nn.softmax(alpha_hat, axis=1) + self.eps, axis=2 )
 
-            beta = tf.expand_dims( tf.math.softplus(beta_hat), axis=2 )
+            beta = tf.expand_dims( tf.math.softplus(beta_hat), axis=2 ) + self.eps
             
             kappa = tf.expand_dims(previous_kappa + tf.math.softplus(kappa_hat), axis=2)
 
