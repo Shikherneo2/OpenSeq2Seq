@@ -761,7 +761,7 @@ class ZhaopengLocationLayer(layers_base.Layer):
     return location_attention
 
 
-class GravesAttention( _BaseAttentionMechanism ):
+class GravesAttentionGaussian( _BaseAttentionMechanism ):
     def __init__(
                 self,
                 num_units,
@@ -792,6 +792,7 @@ class GravesAttention( _BaseAttentionMechanism ):
         self.dtype = dtype
         self.eps = 1e-7
         self.num_mixtures = 10
+        self.training = training
         # 0.55, 
         self.query_layer1 = tf.layers.Dense( 3 * self.num_mixtures, activation="relu", name='gmm_query_layer', use_bias=True, dtype=self.dtype )
 
@@ -809,7 +810,7 @@ class GravesAttention( _BaseAttentionMechanism ):
             previous_kappa = state
             
             params = self.query_layer1(query)
-            alpha_hat, beta_hat, kappa_hat = tf.split(paramcs, num_or_size_splits=3, axis=1)
+            alpha_hat, beta_hat, kappa_hat = tf.split(params, num_or_size_splits=3, axis=1)
 
             # [batch_size, num_mixtures, 1]
             # alpha = tf.expand_dims( tf.math.softplus(alpha_hat), axis=2 )
@@ -832,7 +833,7 @@ class GravesAttention( _BaseAttentionMechanism ):
 
         return alignments, state
 
-class GravesAttentionOld(_BaseAttentionMechanism):
+class GravesAttention(_BaseAttentionMechanism):
   """ Implements Graves-style (additive) GMM based attention mechanism. Ported to tensorflow from pytorch code by Mozilla TTS.
       https://github.com/mozilla/TTS/blob/dev/layers/common_layers.py#L147
   """
@@ -879,13 +880,14 @@ class GravesAttentionOld(_BaseAttentionMechanism):
     #m = math.sqrt(1.0/self.K)
     #bias_random_init = np.random.uniform( -m, m, self.K)
     # zeros, 1-mean, 10-std
+    # layer1 = tf.layers.Dense( units=3*self.K, activation="relu", name="graves_attention_denselayer1", trainable=True, dtype=dtype, bias_initializer=bias_init )
     bias_init = tf.constant_initializer( np.hstack([np.zeros(self.K), np.full(self.K, 10), np.ones(self.K)]) )
-    layer1 = tf.layers.Dense( units=3*self.K, activation="relu", name="graves_attention_denselayer1", trainable=True, dtype=dtype, bias_initializer=bias_init )
-    # layer1 = tf.layers.Dense( units=num_units, activation="relu", name="graves_attention_denselayer1", trainable=True, dtype=dtype )
-    # layer2 = tf.layers.Dense( units=3*self.K, bias_initializer=bias_init, name="graves_attention_denselayer2", trainable=True, dtype=dtype )
+    layer1 = tf.layers.Dense( units=num_units, activation="relu", name="graves_attention_denselayer1", trainable=True, dtype=dtype )
+    layer2 = tf.layers.Dense( units=3*self.K, bias_initializer=bias_init, name="graves_attention_denselayer2", trainable=True, dtype=dtype )
+    self.dense_layer = layer2(layer1)
     # self.dense_layer = lambda x: layer2(layer1(x))
+    # self.dense_layer = lambda x: layer1(x)
     
-    self.dense_layer = lambda x: layer1(x)
     self.seq_len = self._alignments_size
     self.J = tf.cast( tf.range( self.seq_len + 2 ), dtype=dtype) + 0.5
 
@@ -905,12 +907,12 @@ class GravesAttentionOld(_BaseAttentionMechanism):
       mu_t = mu_prev + tf.math.softplus(k_t)
       sig_t = tf.math.softplus(b_t) + self.eps
 
-      g_t = tf.layers.dropout( g_t, rate=0.5, training=self.training )
+      # g_t = tf.layers.dropout( g_t, rate=0.5, training=self.training )
       g_t = tf.nn.softmax( g_t, axis=1 ) + self.eps
 
       x = (j-tf.expand_dims(mu_t, -1))/ tf.expand_dims(sig_t, -1)
-    #   phi_t = tf.expand_dims(g_t, -1) * tf.nn.sigmoid( x )
-      phi_t = tf.expand_dims(g_t, -1) * 1/( 1 + tf.nn.sigmoid( -x ) )
+      phi_t = tf.expand_dims(g_t, -1) * tf.nn.sigmoid( x )
+      # phi_t = tf.expand_dims(g_t, -1) * 1/( 1 + tf.nn.sigmoid( -x ) )
 
       # phi_t = x/( tf.expand_dims(sig_t, -1)*x*x )
       alpha_t = tf.reduce_sum( phi_t, 1 )
@@ -921,15 +923,7 @@ class GravesAttentionOld(_BaseAttentionMechanism):
       alpha_t = a-b
       
       #replace 0 with 1e-8
-      # alpha_t = tf.where( tf.equal( 0., alpha_t ), 1e-8 * tf.ones_like( alpha_t ), alpha_t )
-      if self.print_logs:
-        mu_prev = tf.Print( mu_prev, [mu_prev[0]], "Previous state" )
-        k_t = tf.Print( k_t, [k_t[0][0]], "Mu-cap" )
-        mu_t = tf.Print( mu_t, [mu_t[0]], "Mu" )
-        sig_t = tf.Print( sig_t, [sig_t[0]], "Sigma" )
-        g_t = tf.Print( g_t, [g_t[0]], "Softmax" )
-        alpha_t = tf.Print( alpha_t, [alpha_t[0]], "Alpha" )
-
+      alpha_t = tf.where( tf.equal( 0., alpha_t ), 1e-8 * tf.ones_like( alpha_t ), alpha_t )
       alpha_t = self.maybe_mask_score(alpha_t)
 
     next_state = mu_t 

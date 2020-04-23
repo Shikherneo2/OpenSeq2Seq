@@ -19,6 +19,29 @@ from open_seq2seq.parts.tacotron.tacotron_decoder import TacotronDecoder
 from open_seq2seq.parts.cnns.conv_blocks import conv_bn_actv
 from .decoder import Decoder
 
+class LinearBN():
+  def __init__( self, index, num_units, activation_fn, dtype, training):
+    self.training = training
+    self.linear_layer = tf.layers.Dense(
+              name="prenet_{}".format(index + 1),
+              units=num_units,
+              activation=activation_fn,
+              use_bias=True,
+              dtype=dtype
+          )
+    self.bn = tf.layers.batch_normalization(
+            name="prenet_bn_{}".format(index+1),
+            inputs=self.linear_layer,
+            gamma_regularizer=tf.contrib.layers.l2_regularizer,
+            training=training,
+            axis=-1,
+            momentum=0.1,
+            epsilon=1e-5,
+        )
+        
+  def __call__( self, x ):
+    return self.bn(x)
+
 
 class Prenet():
   """
@@ -29,7 +52,8 @@ class Prenet():
       num_units,
       num_layers,
       activation_fn=None,
-      dtype=None
+      dtype=None,
+      training=True
   ):
     """Prenet initializer
 
@@ -47,13 +71,7 @@ class Prenet():
 
     for idx in range(num_layers):
       self.prenet_layers.append(
-          tf.layers.Dense(
-              name="prenet_{}".format(idx + 1),
-              units=num_units,
-              activation=activation_fn,
-              use_bias=True,
-              dtype=dtype
-          )
+        LinearBN( idx, num_units, activation_fn, dtype, training )
       )
 
   def __call__(self, inputs):
@@ -350,7 +368,8 @@ class Tacotron2Decoder(Decoder):
           self.params.get('prenet_units', 256),
           self.params.get('prenet_layers', 2),
           self.params.get("prenet_activation", tf.nn.relu),
-          self.params["dtype"]
+          self.params["dtype"],
+          training
       )
 
     cell_params = {}
@@ -407,18 +426,17 @@ class Tacotron2Decoder(Decoder):
       )
     else:
       raise ValueError("Unknown mode for decoder: {}".format(self._mode))
+
     decoder = TacotronDecoder(
-        decoder_cell=decoder_cell,
-        helper=helper,
-        initial_decoder_state=decoder_cell.zero_state(
-            _batch_size, self.params["dtype"]
-        ),
-        attention_type=self.params["attention_type"],
-        spec_layer=output_projection_layer,
-        stop_token_layer=stop_token_projection_layer,
-        prenet=prenet,
-        dtype=self.params["dtype"],
-        train=train_and_not_sampling
+        decoder_cell = decoder_cell,
+        helper = helper,
+        initial_decoder_state = decoder_cell.zero_state( _batch_size, self.params["dtype" ] ),
+        attention_type = self.params["attention_type"],
+        spec_layer = output_projection_layer,
+        stop_token_layer = stop_token_projection_layer,
+        prenet = prenet,
+        dtype = self.params["dtype"],
+        train = train_and_not_sampling
     )
 
     if self._mode == 'train':
@@ -523,6 +541,7 @@ class Tacotron2Decoder(Decoder):
       alignments = tf.zeros([_batch_size, _batch_size, _batch_size])
 
     spectrogram_prediction = decoder_output + top_layer
+
     if self._both:
       mag_spec_prediction = spectrogram_prediction
       mag_spec_prediction = conv_bn_actv(

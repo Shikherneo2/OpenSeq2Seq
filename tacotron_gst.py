@@ -61,9 +61,7 @@ else:
   raise ValueError("Unknown param for output_type")
 
 base_params = {
-#  "win_length": win_length,
-#	"hop_length": hop_length,
-	"random_seed": 0,
+  "random_seed": 0,
   "use_horovod": False,
   "num_gpus": 1,
   "num_epochs": 500,
