@@ -882,9 +882,9 @@ class GravesAttention(_BaseAttentionMechanism):
     # zeros, 1-mean, 10-std
     # layer1 = tf.layers.Dense( units=3*self.K, activation="relu", name="graves_attention_denselayer1", trainable=True, dtype=dtype, bias_initializer=bias_init )
     bias_init = tf.constant_initializer( np.hstack([np.zeros(self.K), np.full(self.K, 10), np.ones(self.K)]) )
-    layer1 = tf.layers.Dense( units=num_units, activation="relu", name="graves_attention_denselayer1", trainable=True, dtype=dtype )
-    layer2 = tf.layers.Dense( units=3*self.K, bias_initializer=bias_init, name="graves_attention_denselayer2", trainable=True, dtype=dtype )
-    self.dense_layer = layer2(layer1)
+    self.layer1 = tf.layers.Dense( units=num_units, activation="relu", name="graves_attention_denselayer1", trainable=True, dtype=dtype )
+    self.layer2 = tf.layers.Dense( units=3*self.K, bias_initializer=bias_init, name="graves_attention_denselayer2", trainable=True, dtype=dtype )
+    # self.dense_layer = layer2(layer1)
     # self.dense_layer = lambda x: layer2(layer1(x))
     # self.dense_layer = lambda x: layer1(x)
     
@@ -901,7 +901,7 @@ class GravesAttention(_BaseAttentionMechanism):
     with variable_scope.variable_scope(None, "graves_attention", [query]):
       j = tf.slice( self.J, [0], [ seq_length+1 ] )
 
-      gbk_t = self.dense_layer( query )
+      gbk_t = self.layer2( self.layer1(query) )
       g_t, b_t, k_t = tf.split( gbk_t, num_or_size_splits=3, axis=1 )
 
       mu_t = mu_prev + tf.math.softplus(k_t)

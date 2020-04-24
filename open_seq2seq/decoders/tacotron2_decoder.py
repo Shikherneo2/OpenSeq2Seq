@@ -22,25 +22,25 @@ from .decoder import Decoder
 class LinearBN():
   def __init__( self, index, num_units, activation_fn, dtype, training):
     self.training = training
+    self.index = index
     self.linear_layer = tf.layers.Dense(
-              name="prenet_{}".format(index + 1),
+              name="prenet_{}".format(self.index + 1),
               units=num_units,
               activation=activation_fn,
               use_bias=True,
               dtype=dtype
           )
-    self.bn = tf.layers.batch_normalization(
-            name="prenet_bn_{}".format(index+1),
-            inputs=self.linear_layer,
+    self.bn = tf.layers.BatchNormalization(
+            name="prenet_bn_{}".format(self.index+1),
             gamma_regularizer=tf.contrib.layers.l2_regularizer,
-            training=training,
+            training=self.training,
             axis=-1,
             momentum=0.1,
             epsilon=1e-5,
         )
         
   def __call__( self, x ):
-    return self.bn(x)
+    return self.bn.apply(self.linear_layer(x), self.training)
 
 
 class Prenet():
@@ -91,7 +91,7 @@ class Prenet():
     Adds regularization to all prenet kernels
     """
     for layer in self.prenet_layers:
-      for weights in layer.trainable_variables:
+      for weights in layer.linear_layer.trainable_variables:
         if "bias" not in weights.name:
           # print("Added regularizer to {}".format(weights.name))
           if weights.dtype.base_dtype == tf.float16:
