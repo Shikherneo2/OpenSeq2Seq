@@ -30,17 +30,24 @@ class LinearBN():
               use_bias=True,
               dtype=dtype
           )
-    self.bn = tf.layers.BatchNormalization(
-            name="prenet_bn_{}".format(self.index+1),
-            gamma_regularizer=tf.contrib.layers.l2_regularizer,
-            training=self.training,
-            axis=-1,
-            momentum=0.1,
-            epsilon=1e-5,
-        )
+    # self.bn = tf.layers.BatchNormalization(
+    #         name="prenet_bn_{}".format(self.index+1),
+    #         gamma_regularizer=tf.contrib.layers.l2_regularizer,
+    #         training=self.training,
+    #         axis=-1,
+    #         momentum=0.1,
+    #         epsilon=1e-5,
+    #     )
         
   def __call__( self, x ):
-    return self.bn.apply(self.linear_layer(x), self.training)
+    return tf.contrib.layers.batch_norm(
+            self.linear_layer(x),
+            updates_collections=None,
+            scope="prenet_bn_{}".format(self.index+1),
+            decay=0.1,
+            epsilon=1e-5,
+            is_training=self.training
+        )
 
 
 class Prenet():
