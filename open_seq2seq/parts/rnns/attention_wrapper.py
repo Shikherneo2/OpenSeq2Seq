@@ -174,24 +174,6 @@ class _BaseAttentionMechanism(AttentionMechanism):
     1. Storing the query and memory layers.
     2. Preprocessing and storing the memory.
   """
-# query_layer=layers_core.Dense(
-#             num_units, name="query_layer", use_bias=False, dtype=dtype
-#         ),
-#         memory_layer = Conv1D(
-#             name="memory_layer".format(name),
-#             filters=num_units,
-#             kernel_size=1,
-#             strides=1,
-#             padding="SAME",
-#             use_bias=False,
-#             data_format="channels_last",
-#             dtype=dtype
-#         ),
-#         memory=memory,
-#         probability_fn=wrapped_probability_fn,
-#         memory_sequence_length=memory_sequence_length,
-#         score_mask_value=score_mask_value,
-#         name=name
   def __init__(
       self,
       query_layer,
@@ -229,53 +211,29 @@ class _BaseAttentionMechanism(AttentionMechanism):
         `memory_sequence_length` is not None.
       name: Name to use when creating ops.
     """
-    if (
-        query_layer is not None and
-        not isinstance(query_layer, layers_base.Layer)
-    ):
-      raise TypeError(
-          "query_layer is not a Layer: %s" % type(query_layer).__name__
-      )
-    if (
-        memory_layer is not None and
-        not isinstance(memory_layer, layers_base.Layer)
-    ):
-      raise TypeError(
-          "memory_layer is not a Layer: %s" % type(memory_layer).__name__
-      )
+    if ( query_layer is not None and not isinstance(query_layer, layers_base.Layer ) ):
+      raise TypeError( "query_layer is not a Layer: %s" % type(query_layer).__name__ )
+    if ( memory_layer is not None and not isinstance(memory_layer, layers_base.Layer) ):
+      raise TypeError( "memory_layer is not a Layer: %s" % type(memory_layer).__name__  )
+    
     self._query_layer = query_layer
     self._memory_layer = memory_layer
     self.dtype = memory.dtype
+    
     if not callable(probability_fn):
-      raise TypeError(
-          "probability_fn must be callable, saw type: %s" %
-          type(probability_fn).__name__
-      )
+      raise TypeError( "probability_fn must be callable, saw type: %s" % type(probability_fn).__name__ )
+    
     if score_mask_value is None:
-      score_mask_value = dtypes.as_dtype(self.dtype
-                                         ).as_numpy_dtype(-np.inf)
+      score_mask_value = dtypes.as_dtype( self.dtype ).as_numpy_dtype(-np.inf)
+    
     self._probability_fn = lambda score, prev: (  # pylint:disable=g-long-lambda
-        probability_fn(
-            _maybe_mask_score(score, memory_sequence_length, score_mask_value),
-            prev))
-    with ops.name_scope(
-        name, "BaseAttentionMechanismInit", nest.flatten(memory)
-    ):
-      self._values = _prepare_memory(
-          memory,
-          memory_sequence_length,
-          check_inner_dims_defined=check_inner_dims_defined
-      )
-      self._keys = (
-          self.memory_layer(self._values) if self.memory_layer  # pylint: disable=not-callable
-          else self._values
-      )
-      self._batch_size = (
-          self._keys.shape[0].value or array_ops.shape(self._keys)[0]
-      )
-      self._alignments_size = (
-          self._keys.shape[1].value or array_ops.shape(self._keys)[1]
-      )
+                                  probability_fn( _maybe_mask_score(score, memory_sequence_length, score_mask_value), prev) )
+    
+    with ops.name_scope( name, "BaseAttentionMechanismInit", nest.flatten(memory) ):
+      self._values = _prepare_memory( memory, memory_sequence_length, check_inner_dims_defined=check_inner_dims_defined )
+      self._keys = ( self.memory_layer(self._values) if self.memory_layer else self._values )
+      self._batch_size = ( self._keys.shape[0].value or array_ops.shape(self._keys)[0] )
+      self._alignments_size = ( self._keys.shape[1].value or array_ops.shape(self._keys)[1] )
 
   @property
   def memory_layer(self):
@@ -877,16 +835,10 @@ class GravesAttention(_BaseAttentionMechanism):
     self.print_logs = False
 
     # Mimicking pytorch's default bias initializer
-    #m = math.sqrt(1.0/self.K)
-    #bias_random_init = np.random.uniform( -m, m, self.K)
-    # zeros, 1-mean, 10-std
-    # layer1 = tf.layers.Dense( units=3*self.K, activation="relu", name="graves_attention_denselayer1", trainable=True, dtype=dtype, bias_initializer=bias_init )
+    # zeros, 10-std, 1-mean
     bias_init = tf.constant_initializer( np.hstack([np.zeros(self.K), np.full(self.K, 10), np.ones(self.K)]) )
     self.layer1 = tf.layers.Dense( units=num_units, activation="relu", name="graves_attention_denselayer1", trainable=True, dtype=dtype )
     self.layer2 = tf.layers.Dense( units=3*self.K, bias_initializer=bias_init, name="graves_attention_denselayer2", trainable=True, dtype=dtype )
-    # self.dense_layer = layer2(layer1)
-    # self.dense_layer = lambda x: layer2(layer1(x))
-    # self.dense_layer = lambda x: layer1(x)
     
     self.seq_len = self._alignments_size
     self.J = tf.cast( tf.range( self.seq_len + 2 ), dtype=dtype) + 0.5
@@ -911,9 +863,9 @@ class GravesAttention(_BaseAttentionMechanism):
       g_t = tf.nn.softmax( g_t, axis=1 ) + self.eps
 
       x = (j-tf.expand_dims(mu_t, -1))/ tf.expand_dims(sig_t, -1)
-      phi_t = tf.expand_dims(g_t, -1) * tf.nn.sigmoid( x )
-      # phi_t = tf.expand_dims(g_t, -1) * 1/( 1 + tf.nn.sigmoid( -x ) )
+      phi_t = tf.expand_dims(g_t, -1) * 1/( 1 + tf.nn.sigmoid( -x ) )
 
+      # phi_t = tf.expand_dims(g_t, -1) * tf.nn.sigmoid( x )
       # phi_t = x/( tf.expand_dims(sig_t, -1)*x*x )
       alpha_t = tf.reduce_sum( phi_t, 1 )
 
@@ -1541,10 +1493,7 @@ class AttentionWrapperState(
         return tensor_util.with_same_shape(old, new)
       return new
 
-    return nest.map_structure(
-        with_same_shape, self,
-        super(AttentionWrapperState, self)._replace(**kwargs)
-    )
+    return nest.map_structure( with_same_shape, self, super(AttentionWrapperState, self)._replace(**kwargs) )
 
 
 def hardmax(logits, name=None):
@@ -1564,14 +1513,10 @@ def hardmax(logits, name=None):
       depth = logits.get_shape()[-1].value
     else:
       depth = array_ops.shape(logits)[-1]
-    return array_ops.one_hot(
-        math_ops.argmax(logits, -1), depth, dtype=logits.dtype
-    )
+    return array_ops.one_hot( math_ops.argmax(logits, -1), depth, dtype=logits.dtype )
 
 
-def _compute_attention(
-    attention_mechanism, cell_output, attention_state, attention_layer
-):
+def _compute_attention( attention_mechanism, cell_output, attention_state, attention_layer ):
   """Computes the attention and alignments for a given attention_mechanism."""
   alignments, next_attention_state = attention_mechanism(
       cell_output, state=attention_state
@@ -1689,6 +1634,7 @@ class AttentionWrapper(rnn_cell_impl.RNNCell):
     """
     super(AttentionWrapper, self).__init__(name=name)
     rnn_cell_impl.assert_like_rnncell("cell", cell)
+    
     if isinstance(attention_mechanism, (list, tuple)):
       self._is_multi = True
       attention_mechanisms = attention_mechanism
@@ -1704,27 +1650,20 @@ class AttentionWrapper(rnn_cell_impl.RNNCell):
       if not isinstance(attention_mechanism, AttentionMechanism):
         raise TypeError(
             "attention_mechanism must be an AttentionMechanism or list of "
-            "multiple AttentionMechanism instances, saw type: %s" %
-            type(attention_mechanism).__name__
-        )
+            "multiple AttentionMechanism instances, saw type: %s" % type(attention_mechanism).__name__ )
+
       attention_mechanisms = (attention_mechanism,)
 
     if cell_input_fn is None:
-      cell_input_fn = (
-          lambda inputs, attention: array_ops.concat([inputs, attention], -1)
-      )
+      cell_input_fn = ( lambda inputs, attention: array_ops.concat([inputs, attention], -1) )
     else:
       if not callable(cell_input_fn):
-        raise TypeError(
-            "cell_input_fn must be callable, saw type: %s" %
-            type(cell_input_fn).__name__
-        )
+        raise TypeError( "cell_input_fn must be callable, saw type: %s" % type(cell_input_fn).__name__ )
 
     if attention_layer_size is not None:
       attention_layer_sizes = tuple(
           attention_layer_size
-          if isinstance(attention_layer_size, (list, tuple
-                                               )) else (attention_layer_size,)
+          if isinstance(attention_layer_size, (list, tuple)) else (attention_layer_size,)
       )
       if len(attention_layer_sizes) != len(attention_mechanisms):
         raise ValueError(
@@ -1771,15 +1710,13 @@ class AttentionWrapper(rnn_cell_impl.RNNCell):
             "via the tf.contrib.seq2seq.tile_batch function with argument "
             "multiple=beam_width."
         )
-        with ops.control_dependencies(
-            self._batch_size_checks(state_batch_size, error_message)
-        ):
+        with ops.control_dependencies( self._batch_size_checks(state_batch_size, error_message) ):
           self._initial_cell_state = nest.map_structure(
               lambda s: array_ops.identity(s, name="check_initial_cell_state"),
               initial_cell_state
           )
 
-  def _batch_size_checks(self, batch_size, error_message):
+  def _batch_size_checks( self, batch_size, error_message ):
     return [
         check_ops.assert_equal(
             batch_size, attention_mechanism.batch_size, message=error_message
@@ -1830,15 +1767,9 @@ class AttentionWrapper(rnn_cell_impl.RNNCell):
         cell_state=self._cell.state_size,
         time=tensor_shape.TensorShape([]),
         attention=self._attention_layer_size,
-        alignments=self._item_or_tuple(
-            a.alignments_size for a in self._attention_mechanisms
-        ),
-        attention_state=self._item_or_tuple(
-            a.state_size for a in self._attention_mechanisms
-        ),
-        alignment_history=self._item_or_tuple(
-            () for _ in self._attention_mechanisms
-        )
+        alignments=self._item_or_tuple( a.alignments_size for a in self._attention_mechanisms ),
+        attention_state=self._item_or_tuple( a.state_size for a in self._attention_mechanisms ),
+        alignment_history=self._item_or_tuple( () for _ in self._attention_mechanisms )
     )  # sometimes a TensorArray
 
   def zero_state(self, batch_size, dtype):
@@ -1875,9 +1806,7 @@ class AttentionWrapper(rnn_cell_impl.RNNCell):
           "the batch_size= argument passed to zero_state is "
           "batch_size * beam_width."
       )
-      with ops.control_dependencies(
-          self._batch_size_checks(batch_size, error_message)
-      ):
+      with ops.control_dependencies( self._batch_size_checks(batch_size, error_message) ):
         cell_state = nest.map_structure(
             lambda s: array_ops.identity(s, name="checked_cell_state"),
             cell_state
@@ -1943,14 +1872,11 @@ class AttentionWrapper(rnn_cell_impl.RNNCell):
     # Step 1: Calculate the true inputs to the cell based on the
     # previous attention value.
 
-    # IS THIS CORRECT?? STATE.ATTENTION IS WHAT??*****************************************
     cell_inputs = self._cell_input_fn(inputs, state.attention)
     cell_state = state.cell_state
     cell_output, next_cell_state = self._cell(cell_inputs, cell_state)
 
-    cell_batch_size = (
-        cell_output.shape[0].value or array_ops.shape(cell_output)[0]
-    )
+    cell_batch_size = ( cell_output.shape[0].value or array_ops.shape(cell_output)[0] )
     error_message = (
         "When applying AttentionWrapper %s: " % self.name +
         "Non-matching batch sizes between the memory "
@@ -1959,9 +1885,7 @@ class AttentionWrapper(rnn_cell_impl.RNNCell):
         "the tf.contrib.seq2seq.tile_batch function with argument "
         "multiple=beam_width."
     )
-    with ops.control_dependencies(
-        self._batch_size_checks(cell_batch_size, error_message)
-    ):
+    with ops.control_dependencies( self._batch_size_checks(cell_batch_size, error_message) ):
       cell_output = array_ops.identity(cell_output, name="checked_cell_output")
 
     if self._is_multi:
@@ -1976,21 +1900,19 @@ class AttentionWrapper(rnn_cell_impl.RNNCell):
     all_attention_states = []
     maybe_all_histories = []
 
-    for i, attention_mechanism in enumerate(self._attention_mechanisms):
+    for i, attention_mechanism in enumerate( self._attention_mechanisms ):
       attention, alignments, next_attention_state = _compute_attention(
           attention_mechanism, cell_output, previous_attention_state[i],
           self._attention_layers[i] if self._attention_layers else None
       )
-      alignment_history = previous_alignment_history[i].write(
-          state.time, alignments
-      ) if self._alignment_history else ()
+      alignment_history = previous_alignment_history[i].write( state.time, alignments ) if self._alignment_history else ()
 
-      all_attention_states.append(next_attention_state)
-      all_alignments.append(alignments)
-      all_attentions.append(attention)
-      maybe_all_histories.append(alignment_history)
+      all_attention_states.append( next_attention_state )
+      all_alignments.append( alignments )
+      all_attentions.append( attention )
+      maybe_all_histories.append( alignment_history )
 
-    attention = array_ops.concat(all_attentions, 1)
+    attention = array_ops.concat( all_attentions, 1 )
     next_state = AttentionWrapperState(
         time=state.time + 1,
         cell_state=next_cell_state,

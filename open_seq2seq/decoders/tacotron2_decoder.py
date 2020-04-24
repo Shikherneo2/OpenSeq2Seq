@@ -9,20 +9,17 @@ import tensorflow as tf
 from tensorflow.python.framework import ops
 
 from open_seq2seq.parts.rnns.utils import single_cell
-from open_seq2seq.parts.rnns.attention_wrapper import BahdanauAttention, \
-                                                 LocationSensitiveAttention, \
-                                                 GravesAttention, \
-                                                 AttentionWrapper
-from open_seq2seq.parts.tacotron.tacotron_helper import TacotronHelper, \
-                                                        TacotronTrainingHelper
+from open_seq2seq.parts.rnns.attention_wrapper import BahdanauAttention, LocationSensitiveAttention, GravesAttention, AttentionWrapper
+from open_seq2seq.parts.tacotron.tacotron_helper import TacotronHelper, TacotronTrainingHelper
 from open_seq2seq.parts.tacotron.tacotron_decoder import TacotronDecoder
 from open_seq2seq.parts.cnns.conv_blocks import conv_bn_actv
 from .decoder import Decoder
 
 class LinearBN():
-  def __init__( self, index, num_units, activation_fn, dtype, training):
+  def __init__( self, index, num_units, activation_fn, dtype, training, regularizer):
     self.training = training
     self.index = index
+    self.regularizer = regularizer
     self.linear_layer = tf.layers.Dense(
               name="prenet_{}".format(self.index + 1),
               units=num_units,
@@ -44,6 +41,7 @@ class LinearBN():
             self.linear_layer(x),
             updates_collections=None,
             scope="prenet_bn_{}".format(self.index+1),
+            param_regularizers=self.regularizer,
             decay=0.1,
             epsilon=1e-5,
             is_training=self.training
@@ -58,9 +56,10 @@ class Prenet():
       self,
       num_units,
       num_layers,
+      regularizer,
       activation_fn=None,
       dtype=None,
-      training=True
+      training=True,
   ):
     """Prenet initializer
 
@@ -70,16 +69,12 @@ class Prenet():
       activation_fn (callable): any valid activation function
       dtype (dtype): the data format for this layer
     """
-    assert (
-        num_layers > 0
-    ), "If the prenet is enabled, there must be at least 1 layer"
+    assert ( num_layers > 0 ), "If the prenet is enabled, there must be at least 1 layer"
     self.prenet_layers = []
     self._output_size = num_units
 
     for idx in range(num_layers):
-      self.prenet_layers.append(
-        LinearBN( idx, num_units, activation_fn, dtype, training )
-      )
+      self.prenet_layers.append( LinearBN( idx, num_units, activation_fn, dtype, training, regularizer ) )
 
   def __call__(self, inputs):
     """
@@ -100,15 +95,10 @@ class Prenet():
     for layer in self.prenet_layers:
       for weights in layer.linear_layer.trainable_variables:
         if "bias" not in weights.name:
-          # print("Added regularizer to {}".format(weights.name))
           if weights.dtype.base_dtype == tf.float16:
-            tf.add_to_collection(
-                'REGULARIZATION_FUNCTIONS', (weights, regularizer)
-            )
+            tf.add_to_collection( 'REGULARIZATION_FUNCTIONS', (weights, regularizer) )
           else:
-            tf.add_to_collection(
-                ops.GraphKeys.REGULARIZATION_LOSSES, regularizer(weights)
-            )
+            tf.add_to_collection( ops.GraphKeys.REGULARIZATION_LOSSES, regularizer(weights) )
 
 
 class Tacotron2Decoder(Decoder):
@@ -236,24 +226,18 @@ class Tacotron2Decoder(Decoder):
     super(Tacotron2Decoder, self).__init__(params, model, name, mode)
     self._model = model
     self._n_feats = self._model.get_data_layer().params['num_audio_features']
+    
     if "both" in self._model.get_data_layer().params['output_type']:
       self._both = True
       if not self.params.get('enable_postnet', True):
-        raise ValueError(
-            "postnet must be enabled for both mode"
-        )
+        raise ValueError( "postnet must be enabled for both mode" )
     else:
       self._both = False
 
-  def _build_attention(
-      self,
-      encoder_outputs,
-      encoder_sequence_length,
-      attention_bias,
-  ):
+  def _build_attention( self, encoder_outputs, encoder_sequence_length, attention_bias ):
     """
     Builds Attention part of the graph.
-    Currently supports "bahdanau", and "location"
+    Currently supports "bahdanau", "location" and Graves GMM attention
     """
     with tf.variable_scope("AttentionMechanism"):
       attention_depth = self.params['attention_layer_size']
@@ -280,10 +264,10 @@ class Tacotron2Decoder(Decoder):
           attention_mechanism = GravesAttention(
                   num_units = attention_depth,
                   memory = encoder_outputs,
-                  memory_sequence_length=encoder_sequence_length,
-                  probability_fn=tf.nn.softmax,
-                  training=(self._mode == "train"),
-                  dtype=tf.get_variable_scope().dtype,
+                  memory_sequence_length = encoder_sequence_length,
+                  probability_fn = tf.nn.softmax,
+                  training = (self._mode == "train"),
+                  dtype = tf.get_variable_scope().dtype,
                   )
       else:
         raise ValueError('Unknown Attention Type')
@@ -331,10 +315,8 @@ class Tacotron2Decoder(Decoder):
     encoder_outputs = input_dict['encoder_output']['outputs']
     enc_src_lengths = input_dict['encoder_output']['src_length']
     if self._mode == "train":
-      spec = input_dict['target_tensors'][0] if 'target_tensors' in \
-                                                    input_dict else None
-      spec_length = input_dict['target_tensors'][2] if 'target_tensors' in \
-                                                    input_dict else None
+      spec = input_dict['target_tensors'][0] if 'target_tensors' in input_dict else None
+      spec_length = input_dict['target_tensors'][2] if 'target_tensors' in input_dict else None
     _batch_size = encoder_outputs.get_shape().as_list()[0]
 
     training = (self._mode == "train")
@@ -342,10 +324,7 @@ class Tacotron2Decoder(Decoder):
 
     if self.params.get('enable_postnet', True):
       if "postnet_conv_layers" not in self.params:
-        raise ValueError(
-            "postnet_conv_layers must be passed from config file if postnet is"
-            "enabled"
-        )
+        raise ValueError( "postnet_conv_layers must be passed from config file if postnet is" "enabled" )
 
     if self._both:
       num_audio_features = self._n_feats["mel"]
@@ -376,7 +355,8 @@ class Tacotron2Decoder(Decoder):
           self.params.get('prenet_layers', 2),
           self.params.get("prenet_activation", tf.nn.relu),
           self.params["dtype"],
-          training
+          training,
+          regularizer
       )
 
     cell_params = {}

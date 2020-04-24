@@ -97,9 +97,6 @@ base_params = {
 
   "summaries": ['learning_rate', 'gradients', 'gradient_norm', 'larc_summaries'],
 
-#   "summaries": ['learning_rate', 'variables', 'gradients', 'larc_summaries',
-#                 'variable_norm', 'gradient_norm', 'global_gradient_norm'],
-
   "encoder": Tacotron2Encoder,
   "encoder_params": {
     "cnn_dropout_prob": 0.5,
