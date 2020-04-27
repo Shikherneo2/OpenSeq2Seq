@@ -41,7 +41,10 @@ class LinearBN():
             self.linear_layer(x),
             updates_collections=None,
             scope="prenet_bn_{}".format(self.index+1),
-            param_regularizers=self.regularizer,
+            param_regularizers={ 
+				"beta": self.regularizer, 
+				"gamma": self.regularizer 
+			},
             decay=0.1,
             epsilon=1e-5,
             is_training=self.training
@@ -353,10 +356,10 @@ class Tacotron2Decoder(Decoder):
       prenet = Prenet(
           self.params.get('prenet_units', 256),
           self.params.get('prenet_layers', 2),
+		  regularizer,
           self.params.get("prenet_activation", tf.nn.relu),
           self.params["dtype"],
           training,
-          regularizer
       )
 
     cell_params = {}
