@@ -27,24 +27,16 @@ class LinearBN():
               use_bias=True,
               dtype=dtype
           )
-    # self.bn = tf.layers.BatchNormalization(
-    #         name="prenet_bn_{}".format(self.index+1),
-    #         gamma_regularizer=tf.contrib.layers.l2_regularizer,
-    #         training=self.training,
-    #         axis=-1,
-    #         momentum=0.1,
-    #         epsilon=1e-5,
-    #     )
-        
+
   def __call__( self, x ):
     return tf.contrib.layers.batch_norm(
             self.linear_layer(x),
             updates_collections=None,
             scope="prenet_bn_{}".format(self.index+1),
             param_regularizers={ 
-				"beta": self.regularizer, 
-				"gamma": self.regularizer 
-			},
+                "beta": self.regularizer, 
+                "gamma": self.regularizer 
+            },
             decay=0.1,
             epsilon=1e-5,
             is_training=self.training
@@ -77,7 +69,15 @@ class Prenet():
     self._output_size = num_units
 
     for idx in range(num_layers):
-      self.prenet_layers.append( LinearBN( idx, num_units, activation_fn, dtype, training, regularizer ) )
+    #   self.prenet_layers.append( LinearBN( idx, num_units, activation_fn, dtype, training, regularizer ) )
+        self.prenet_layers.append( 
+            tf.layers.Dense(
+              name="prenet_{}".format(idx + 1),
+              units=num_units,
+              activation=activation_fn,
+              use_bias=True,
+              dtype=dtype ) 
+            )
 
   def __call__(self, inputs):
     """
@@ -356,7 +356,7 @@ class Tacotron2Decoder(Decoder):
       prenet = Prenet(
           self.params.get('prenet_units', 256),
           self.params.get('prenet_layers', 2),
-		  regularizer,
+          regularizer,
           self.params.get("prenet_activation", tf.nn.relu),
           self.params["dtype"],
           training,

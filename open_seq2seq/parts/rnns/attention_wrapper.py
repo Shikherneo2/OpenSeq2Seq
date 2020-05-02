@@ -836,7 +836,7 @@ class GravesAttention(_BaseAttentionMechanism):
 
     # Mimicking pytorch's default bias initializer
     # zeros, 10-std, 1-mean
-    bias_init = tf.constant_initializer( np.hstack([np.zeros(self.K), np.full(self.K, 10), np.ones(self.K)]) )
+    bias_init = tf.constant_initializer( np.hstack([np.full(self.K, 0), np.full(self.K, 1), np.full(self.K, 1)]) )
     self.layer1 = tf.layers.Dense( units=num_units, activation="relu", name="graves_attention_denselayer1", trainable=True, dtype=dtype )
     self.layer2 = tf.layers.Dense( units=3*self.K, bias_initializer=bias_init, name="graves_attention_denselayer2", trainable=True, dtype=dtype )
     
