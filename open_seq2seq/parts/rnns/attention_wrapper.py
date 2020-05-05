@@ -773,7 +773,7 @@ class GravesAttentionGaussian( _BaseAttentionMechanism ):
             # [batch_size, num_mixtures, 1]
             # alpha = tf.expand_dims( tf.math.softplus(alpha_hat), axis=2 )
             # softmax makes the alpha value more stable.
-            alpha_hat = tf.layers.dropout( alpha_hat, rate=0.65, training=self.training )
+            alpha_hat = tf.layers.dropout( alpha_hat, rate=0.45, training=self.training )
             alpha = tf.expand_dims( tf.nn.softmax(alpha_hat, axis=1) + self.eps, axis=2 )
 
             beta = tf.expand_dims( tf.math.softplus(beta_hat), axis=2 ) + self.eps
@@ -790,6 +790,7 @@ class GravesAttentionGaussian( _BaseAttentionMechanism ):
         state = tf.squeeze(kappa, axis=2)
 
         return alignments, state
+
 
 class GravesAttention(_BaseAttentionMechanism):
   """ Implements Graves-style (additive) GMM based attention mechanism. Ported to tensorflow from pytorch code by Mozilla TTS.
@@ -836,9 +837,10 @@ class GravesAttention(_BaseAttentionMechanism):
 
     # Mimicking pytorch's default bias initializer
     # zeros, 10-std, 1-mean
-    bias_init = tf.constant_initializer( np.hstack([np.full(self.K, 0), np.full(self.K, 1), np.full(self.K, 1)]) )
-    self.layer1 = tf.layers.Dense( units=num_units, activation="relu", name="graves_attention_denselayer1", trainable=True, dtype=dtype )
-    self.layer2 = tf.layers.Dense( units=3*self.K, bias_initializer=bias_init, name="graves_attention_denselayer2", trainable=True, dtype=dtype )
+    bias_init = tf.constant_initializer( np.hstack([np.full(self.K, 0), np.full(self.K, 10), np.full(self.K, 1)]) )
+
+    self.layer1 = tf.layers.Dense( units=num_units, activation="relu", name="graves_attention_denselayer1", dtype=dtype, use_bias=True )
+    self.layer2 = tf.layers.Dense( units=3*self.K, bias_initializer=bias_init, activation="relu", name="graves_attention_denselayer2", dtype=dtype, use_bias=True )
     
     self.seq_len = self._alignments_size
     self.J = tf.cast( tf.range( self.seq_len + 2 ), dtype=dtype) + 0.5

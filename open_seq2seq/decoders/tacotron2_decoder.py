@@ -76,8 +76,9 @@ class Prenet():
               units=num_units,
               activation=activation_fn,
               use_bias=True,
-              dtype=dtype ) 
-            )
+              dtype=dtype 
+			) 
+		)
 
   def __call__(self, inputs):
     """
