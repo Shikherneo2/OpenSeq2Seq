@@ -50,6 +50,7 @@ class Tacotron2Encoder(Encoder):
             'zoneout_prob': float,
             'style_embedding_enable': bool,
             'style_embedding_params': dict,
+            "save_embeddings": bool
         }
     )
 
@@ -101,6 +102,40 @@ class Tacotron2Encoder(Encoder):
     """
     super(Tacotron2Encoder, self).__init__(params, model, name, mode)
 
+  def highwaynet(self, inputs, scope, num_units):
+    with tf.variable_scope(scope):
+      H = tf.layers.dense(
+        inputs,
+        units=num_units,
+        activation=tf.nn.relu,
+        name='H')
+      T = tf.layers.dense(
+        inputs,
+        units=num_units,
+        activation=tf.nn.sigmoid,
+        name='T',
+        bias_initializer=tf.constant_initializer(-1.0))
+      return H * T + inputs * (1.0 - T)
+
+  def identity_initializer(self):
+    def _initializer(shape, dtype=tf.float32):
+      print("Shape")
+      print(shape)
+      if len(shape) == 1:
+        return tf.constant(0., dtype=dtype, shape=shape)
+      elif len(shape) == 2 and shape[0] == shape[1]:
+        return tf.constant(np.identity(shape[0], dtype))
+      elif len(shape) == 4 and shape[2] == shape[3]:
+        array = np.zeros(shape, dtype=float)
+        cx, cy = shape[0]/2, shape[1]/2
+        for i in range(shape[2]):
+          array[cx, cy, i, i] = 1
+        return tf.constant(array, dtype=dtype)
+      else:
+          raise Exception("Invalid shape for identity initializer.")
+    return _initializer
+
+
   def _encode(self, input_dict):
     """Creates TensorFlow graph for Tacotron-2 like encoder.
 
@@ -143,6 +178,18 @@ class Tacotron2Encoder(Encoder):
         # initializer=tf.random_normal_initializer()
     )
 
+    bn_output = tf.layers.batch_normalization(
+      name="{}/bn".format("EncoderEmbeddingMatrix"),
+      inputs=enc_emb_w,
+      beta_regularizer=regularizer,
+      gamma_regularizer=regularizer,
+      training=training,
+      axis=-1 if data_format == 'channels_last' else 1,
+      momentum=self.params.get('bn_momentum', 0.1),
+      epsilon=self.params.get('bn_epsilon', 1e-5),
+    )
+    enc_emb_w = bn_output
+    
     embedded_inputs = tf.cast(
         tf.nn.embedding_lookup(
             enc_emb_w,
@@ -164,6 +211,8 @@ class Tacotron2Encoder(Encoder):
           style_embedding = self._embed_style(style_spec, style_len)
         else:
           raise ValueError("The data layer's style input parameter must be set.")
+
+        unmodified_style_embedding = style_embedding
         style_embedding = tf.expand_dims(style_embedding, 1)
         style_embedding = tf.tile(
             style_embedding,
@@ -171,7 +220,7 @@ class Tacotron2Encoder(Encoder):
         )
 
     # ----- Convolutional layers -----------------------------------------------
-    input_layer = embedded_inputs
+    input_layer = tf.identity(embedded_inputs)
 
     if data_format == 'channels_last':
       top_layer = input_layer
@@ -210,6 +259,10 @@ class Tacotron2Encoder(Encoder):
 
     if data_format == 'channels_first':
       top_layer = tf.transpose(top_layer, [0, 2, 1])
+
+    top_layer = self.highwaynet( top_layer+embedded_inputs, "encoder_highway_network1", ch_out )
+    top_layer = self.highwaynet( top_layer, "encoder_highway_network2", ch_out )
+    top_layer = self.highwaynet( top_layer, "encoder_highway_network3", ch_out )
 
     # ----- RNN ---------------------------------------------------------------
     num_rnn_layers = self.params['num_rnn_layers']
@@ -332,10 +385,18 @@ class Tacotron2Encoder(Encoder):
     if self.params.get("style_embedding_enable", False):
       outputs = tf.concat([outputs, style_embedding], axis=-1)
 
-    return {
-        'outputs': outputs,
-        'src_length': text_len
-    }
+    if self.params["save_embeddings"]:
+      return {
+          'outputs': outputs,
+          'src_length': text_len,
+          "embedding": unmodified_style_embedding
+      }
+    else:
+      return {
+          'outputs': outputs,
+          'src_length': text_len,
+
+      }
 
   def _embed_style(self, style_spec, style_len):
     """

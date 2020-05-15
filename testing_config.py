@@ -12,31 +12,24 @@ from open_seq2seq.optimizers.lr_policies import fixed_lr, transformer_policy, ex
 base_model = Text2SpeechTacotron
 
 dataset = "LJ"
-dataset_location = "/mydata/"
-output_type = "both"
+output_type = "mel"
+infer = "phoneme_model_infer.csv"
+base_location = "/home/sdevgupta/mine/OpenSeq2Seq"
+dataset_location = os.path.join( base_location, "dataset/" )
+logdir_location = os.path.join( base_location, "logs_mixed_phonemes/logs_highway_net/logs")
+batch_size = 12
+
 
 if dataset == "MAILABS":
   trim = True
   mag_num_feats = 401
-  train = "train.csv"
-  val = "val.csv"
-  batch_size = 32
-  n_fft=800
-  sampling_rate=16000
-  win_length=None #defaults to n_fft
-  hop_length=None #defaults to n_fft/4
-
+  train = "train_cleaned_lambda.csv"
+  val = "val_cleaned.csv"
 elif dataset == "LJ":
   trim = False
   mag_num_feats = 513
-  train = "train_32.csv"
-  val = "val.csv"
-  batch_size = 60
-  n_fft=1024
-  sampling_rate=22050
-  win_length=1024 #defaults to n_fft
-  hop_length=256 #defaults to n_fft/4
-
+  train = "train_cleaned_lambda.csv"
+  val = "val_cleaned.csv"
 else:
   raise ValueError("Unknown dataset")
 
@@ -61,15 +54,12 @@ else:
   raise ValueError("Unknown param for output_type")
 
 base_params = {
-  # "win_length": win_length,
-	# "hop_length": hop_length,
-	"save_embeddings": True,
-	"use_npy_wavs": True,
-	"use_phonemes":True,
-	"random_seed": 0,
-  "use_horovod": True,
-  "num_gpus": 8,
-  "num_epochs": 500,
+  "save_embeddings": True,
+
+  "random_seed": 0,
+  "use_horovod": False,
+  "num_gpus": 1,
+  "num_epochs": 1000,
 
   "batch_size_per_gpu": batch_size,
 
@@ -77,9 +67,9 @@ base_params = {
   "print_loss_steps": 50,
   "print_samples_steps": 1000,
   "eval_steps": 1000,
-  "save_checkpoint_steps": 1000,
+  "save_checkpoint_steps": 3000,
   "save_to_tensorboard": True,
-  "logdir": "/mydata/new_results",
+  "logdir": logdir_location,
   "max_grad_norm":1.,
 
   "optimizer": "Adam",
@@ -87,10 +77,10 @@ base_params = {
   "lr_policy": exp_decay,
   "lr_policy_params": {
     "learning_rate": 1e-3,
-    "decay_steps": 10000,
+    "decay_steps": 5000,
     "decay_rate": 0.1,
     "use_staircase_decay": False,
-    "begin_decay_at": 20000,
+    "begin_decay_at": 15000,
     "min_lr": 1e-5,
   },
   "dtype": tf.float32,
@@ -100,13 +90,11 @@ base_params = {
   },
   "initializer": tf.contrib.layers.xavier_initializer,
 
-  "summaries": ['learning_rate', 'gradients', 'gradient_norm', 'larc_summaries'],
-
-#   "summaries": ['learning_rate', 'variables', 'gradients', 'larc_summaries',
-#                 'variable_norm', 'gradient_norm', 'global_gradient_norm'],
+  "summaries": ['learning_rate', 'variables', 'gradients', 'gradient_norm', 'global_gradient_norm', 'variable_norm'],
 
   "encoder": Tacotron2Encoder,
   "encoder_params": {
+		"save_embeddings": True,
     "cnn_dropout_prob": 0.5,
     "rnn_dropout_prob": 0.,
     'src_emb_size': 512,
@@ -170,7 +158,7 @@ base_params = {
       "emb_size": 512,
       'attention_layer_size': 512,
       "num_tokens": 32,
-      "num_heads": 0
+      "num_heads": 8
     }
   },
 
@@ -232,6 +220,10 @@ base_params = {
 
   "data_layer": Text2SpeechDataLayer,
   "data_layer_params": {
+    "save_embeddings": True,
+		"use_npy_wavs": False,
+		"use_phonemes": True,
+
     "dataset": dataset,
     "num_audio_features": num_audio_features,
     "output_type": output_type,
@@ -254,7 +246,7 @@ base_params = {
 train_params = {
   "data_layer_params": {
     "dataset_files": [
-      os.path.join(dataset_location, "train.csv"),
+      os.path.join(dataset_location, train),
     ],
     "shuffle": True,
     "style_input": "wav"
@@ -275,7 +267,9 @@ eval_params = {
 
 infer_params = {
   "data_layer_params": {
-    "dataset_files": ["generate.csv"],
+    "dataset_files": [
+			os.path.join(dataset_location, infer),
+		],
     "duration_max":10000,
     "duration_min":0,
     "shuffle": False,

@@ -144,23 +144,31 @@ class EncoderDecoderModel(Model):
       raise ValueError('source_tensors should be a list')
 
     source_tensors = input_tensors['source_tensors']
+    
     if self.mode == "train" or self.mode == "eval":
       if 'target_tensors' not in input_tensors:
-        raise ValueError('Input tensors should contain "target_tensors" key'
-                         'when mode != "infer"')
+        raise ValueError('Input tensors should contain "target_tensors" key when mode != "infer"')
       if not isinstance(input_tensors['target_tensors'], list):
         raise ValueError('target_tensors should be a list')
       target_tensors = input_tensors['target_tensors']
 
     with tf.variable_scope("ForwardPass"):
-      encoder_input = {"source_tensors": source_tensors}
+      encoder_input = {
+        "source_tensors": source_tensors
+      }
       encoder_output = self.encoder.encode(input_dict=encoder_input)
 
-      decoder_input = {"encoder_output": encoder_output}
+      decoder_input = {
+        "encoder_output": encoder_output
+      }
       if self.mode == "train" or self.mode == "eval":
         decoder_input['target_tensors'] = target_tensors
+      
       decoder_output = self.decoder.decode(input_dict=decoder_input)
       model_outputs = decoder_output.get("outputs", None)
+
+      if self._params["save_embeddings"]:
+        model_outputs.append( encoder_output["embedding"] )
 
       if self.mode == "train" or self.mode == "eval":
         with tf.variable_scope("Loss"):

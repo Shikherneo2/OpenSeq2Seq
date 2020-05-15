@@ -453,17 +453,6 @@ def cast_types(input_dict, dtype):
     cast_input_dict[key] = input_dict[key]
   return cast_input_dict
 
-def get_interactive_infer_results(model, sess, model_in):
-  fetches = [
-      model.get_data_layer().input_tensors,
-      model.get_output_tensors(),
-  ]
-
-  feed_dict = model.get_data_layer().create_feed_dict(model_in)
-
-  inputs, outputs = sess.run(fetches, feed_dict=feed_dict)
-
-  return model.infer(inputs, outputs)
 
 def get_base_config(args):
   """This function parses the command line arguments, reads the config file, and
@@ -813,16 +802,16 @@ def create_model(args, base_config, config_module, base_model, hvd,
   if args.mode == 'train' or args.mode == 'train_eval':
     if 'train_params' in config_module:
       nested_update( train_config, copy.deepcopy(config_module['train_params']) )
-    if hvd is None or hvd.rank() == 0:
-      deco_print("Training config:")
-      pprint.pprint(train_config)
+    # if hvd is None or hvd.rank() == 0:
+    #   deco_print("Training config:")
+    #   pprint.pprint(train_config)
   
   if args.mode == 'eval' or args.mode == 'train_eval':
     if 'eval_params' in config_module:
       nested_update( eval_config, copy.deepcopy(config_module['eval_params']) )
-    if hvd is None or hvd.rank() == 0:
-      deco_print("Evaluation config:")
-      pprint.pprint(eval_config)
+    # if hvd is None or hvd.rank() == 0:
+    #   deco_print("Evaluation config:")
+    #   pprint.pprint(eval_config)
   
   if args.mode == "infer":
     if args.infer_output_file is None:
@@ -830,9 +819,9 @@ def create_model(args, base_config, config_module, base_model, hvd,
                        "required in inference mode")
     if "infer_params" in config_module:
       nested_update(infer_config, copy.deepcopy(config_module['infer_params']))
-    if hvd is None or hvd.rank() == 0:
-      deco_print("Inference config:")
-      pprint.pprint(infer_config)
+    # if hvd is None or hvd.rank() == 0:
+    #   deco_print("Inference config:")
+    #   pprint.pprint(infer_config)
   
   if args.mode == "interactive_infer":
     if "interactive_infer_params" in config_module:

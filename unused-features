@@ -1,0 +1,13 @@
+Temporal Convolutional Network as an alternative to RNNs -- parts/cnns/tcn
+https://arxiv.org/pdf/1811.10166.pdf
+
+Parralizable LSTM -- parts/rnns/slstm.py
+https://arxiv.org/abs/1709.02755
+
+WeightDropLSTM - parts/rnns/weight_drop.py
+Standard LSTM plus 
+Layer normalization -- https://arxiv.org/abs/1607.06450
+Recurrent dropout -- https://arxiv.org/abs/1603
+
+Zoneout -- parts/rnns/zoneout.py
+https://github.com/teganmaharaj/zoneout

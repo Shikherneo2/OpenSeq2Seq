@@ -11,6 +11,12 @@ import tensorflow as tf
 from open_seq2seq.utils import train, infer, evaluate
 from open_seq2seq.utils.utils import deco_print, get_base_config, create_model, create_logdir, check_logdir, check_base_model_logdir
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+# 0 = all messages are logged (default behavior)
+# 1 = INFO messages are not printed
+# 2 = INFO and WARNING messages are not printed
+# 3 = INFO, WARNING, and ERROR messages are not printed
+
 if hasattr(tf.compat, 'v1'):
 	tf.compat.v1.disable_eager_execution()
 

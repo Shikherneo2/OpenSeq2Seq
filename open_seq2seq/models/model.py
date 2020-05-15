@@ -108,6 +108,7 @@ class Model:
 
             # Parameters for XLA
             'use_xla_jit': bool,
+            "save_embeddings": bool,
         }
 
     def __init__(self, params, mode="train", hvd=None):
@@ -421,8 +422,7 @@ class Model:
                             input_tensors,
                             gpu_id=gpu_cnt
                         )
-                    if self._outputs[gpu_cnt] is not None and \
-                            not isinstance(self._outputs[gpu_cnt], list):
+                    if self._outputs[gpu_cnt] is not None and not isinstance(self._outputs[gpu_cnt], list):
                         raise ValueError(
                             'Decoder outputs have to be either None or list')
                     if self._mode == "train" or self._mode == "eval":
@@ -468,8 +468,7 @@ class Model:
                     loss = all_loss
 
                 if self._output is not None and not isinstance(self._output, list):
-                    raise ValueError(
-                        'Decoder outputs have to be either None or list')
+                    raise ValueError( 'Decoder outputs have to be either None or list' )
 
                 if self._mode == "train":
                     self.loss = loss
