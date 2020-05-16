@@ -14,8 +14,7 @@ from six import string_types
 from open_seq2seq.data.data_layer import DataLayer
 from open_seq2seq.data.preprocess import text_to_sequence,symbols
 from open_seq2seq.data.utils import load_pre_existing_vocabulary
-from .speech_utils import get_speech_features_from_file,\
-                          inverse_mel, normalize, denormalize
+from .speech_utils import get_speech_features_from_file, inverse_mel, normalize, denormalize
 
 class Text2SpeechDataLayer(DataLayer):
   """
@@ -27,7 +26,6 @@ class Text2SpeechDataLayer(DataLayer):
     return dict(
         DataLayer.get_required_params(), **{
             'dataset_location': str,
-            'dataset': ['LJ', 'MAILABS'],
             'num_audio_features': None,
             'output_type': ['magnitude', 'mel', 'both'],
             'vocab_file': str,
@@ -61,6 +59,8 @@ class Text2SpeechDataLayer(DataLayer):
             "save_embeddings": bool,
             "use_npy_wavs": bool,
             "use_phonemes": bool,
+            "use_saved_embedding": bool,
+            "saved_embedding_location": str,
         }
     )
 
@@ -139,12 +139,8 @@ class Text2SpeechDataLayer(DataLayer):
     sep = '\x7c'
     header = None
 
-    if self.params["dataset"] == "LJ":
-      self._sampling_rate = self.params.get("sampling_rate", 22050)
-      self._n_fft = self.params.get("n_fft", 1024)
-    elif self.params["dataset"] == "MAILABS":
-      self._sampling_rate = self.params.get("n_fft", 800)
-      self._n_fft = self.params.get("sampling_rate", 16000)
+    self._sampling_rate = self.params.get("sampling_rate", 22050)
+    self._n_fft = self.params.get("n_fft", 1024)
 
     if not self.params["use_phonemes"]:
       self.params['char2idx'] = load_pre_existing_vocabulary(
@@ -322,13 +318,48 @@ class Text2SpeechDataLayer(DataLayer):
                   )
           )
         self._dataset = self._dataset.padded_batch(
-            self.params['batch_size'],
-            padded_shapes=(
-                [None], 1, [None, num_audio_features], [None], 1
-            ),
-            padding_values=(
-              0, 0, tf.cast(pad_value, dtype=self.params['dtype']),
-              tf.cast(1., dtype=self.params['dtype']), 0
+          self.params['batch_size'],
+          padded_shapes=(
+              [None], 1, [None, num_audio_features], [None], 1
+          ),
+          padding_values=(
+            0, 0, tf.cast(pad_value, dtype=self.params['dtype']),
+            tf.cast(1., dtype=self.params['dtype']), 0
+          ),
+        )
+      elif ( self.params['mode'] == "infer" and self.params["use_saved_embedding"]):
+        self._dataset = self._dataset.map(
+          lambda line: tf.py_func(
+            self._parse_audio_transcript_element,
+            [ line ],
+            [ tf.int32, tf.int32, self.params['dtype'], self.params['dtype'], tf.int32, tf.int32, self.params['dtype'] ],
+            stateful=False,
+          ),
+          num_parallel_calls=8,
+        )
+        if ( self.params.get("duration_max", None) or self.params.get("duration_max", None) ):
+          self._dataset = self._dataset.filter(
+            lambda txt, txt_len, spec, stop, spec_len, file_id, embedding:
+              tf.logical_and(
+                tf.less_equal(
+                  spec_len,
+                  self.params.get("duration_max", 4000)
+                ),
+                tf.greater_equal(
+                  spec_len,
+                  self.params.get("duration_min", 0)
+                )
+              )
+          )
+      
+        self._dataset = self._dataset.padded_batch(
+          self.params['batch_size'],
+          padded_shapes=(
+            [None], 1, [None, num_audio_features], [None], 1, 1, [None, 512]
+          ),
+          padding_values=(
+            0, 0, tf.cast(pad_value, dtype=self.params['dtype']),
+            tf.cast(1., dtype=self.params['dtype']), 0, 0, tf.cast(1., dtype=self.params['dtype'])
           ),
         )
       else:
@@ -371,9 +402,11 @@ class Text2SpeechDataLayer(DataLayer):
 
       if( self.params['mode'] != 'infer' ):
         text, text_length, spec, stop_token_target, spec_length = self._iterator.get_next()
-        
       else:
-        text, text_length, spec, stop_token_target, spec_length, file_id = self._iterator.get_next()
+        if (self.params["use_saved_embedding"]):
+          text, text_length, spec, stop_token_target, spec_length, file_id, embedding = self._iterator.get_next()
+        else:
+          text, text_length, spec, stop_token_target, spec_length, file_id = self._iterator.get_next()
       
       spec.set_shape( [self.params['batch_size'], None, num_audio_features] )
       stop_token_target.set_shape([self.params['batch_size'], None])
@@ -401,6 +434,8 @@ class Text2SpeechDataLayer(DataLayer):
       
       if( self.params['mode'] == 'infer' ):
         self._input_tensors["source_tensors"].append( file_id )
+        if (self.params["use_saved_embedding"]):
+          self._input_tensors["source_tensors"].append( embedding )
       else:
         self._input_tensors['target_tensors'] = [
             spec, stop_token_target, spec_length
@@ -554,16 +589,28 @@ class Text2SpeechDataLayer(DataLayer):
     else:
       stop_token_target[-1] = 1.
 
+    if( self.params["mode"]=="infer" and self.params["use_saved_embedding"] ):
+      embedding = np.reshape(np.load( os.path.join(self.params["saved_embedding_location"], "embed-"+str(file_id)+".npy" ) ), (1,512))
+
     assert len(text_input) % pad_to == 0
     assert len(spectrogram) % pad_to == 0
 
     if self.params["mode"]=="infer":
-      return np.int32(text_input), \
-           np.int32([len(text_input)]), \
-           spectrogram.astype(self.params['dtype'].as_numpy_dtype()), \
-           stop_token_target.astype(self.params['dtype'].as_numpy_dtype()), \
-           np.int32([len(spectrogram)]), \
-           np.int32( [file_id] )
+      if (self.params["use_saved_embedding"]):
+        return np.int32(text_input), \
+            np.int32([len(text_input)]), \
+            spectrogram.astype(self.params['dtype'].as_numpy_dtype()), \
+            stop_token_target.astype(self.params['dtype'].as_numpy_dtype()), \
+            np.int32([len(spectrogram)]), \
+            np.int32( [file_id] ), \
+            embedding.astype(self.params['dtype'].as_numpy_dtype())
+      else:
+        return np.int32(text_input), \
+            np.int32([len(text_input)]), \
+            spectrogram.astype(self.params['dtype'].as_numpy_dtype()), \
+            stop_token_target.astype(self.params['dtype'].as_numpy_dtype()), \
+            np.int32([len(spectrogram)]), \
+            np.int32( [file_id] )
     else:
       return np.int32(text_input), \
            np.int32([len(text_input)]), \

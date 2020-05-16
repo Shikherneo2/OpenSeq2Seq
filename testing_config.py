@@ -11,27 +11,24 @@ from open_seq2seq.optimizers.lr_policies import fixed_lr, transformer_policy, ex
 
 base_model = Text2SpeechTacotron
 
-dataset = "LJ"
+batch_size = 12
 output_type = "mel"
-infer = "phoneme_model_infer.csv"
 base_location = "/home/sdevgupta/mine/OpenSeq2Seq"
 dataset_location = os.path.join( base_location, "dataset/" )
 logdir_location = os.path.join( base_location, "logs_mixed_phonemes/logs_highway_net/logs")
-batch_size = 12
 
+save_embeddings = False
+use_npy_wavs = False
+use_phonemes = True
+use_saved_embedding = True
+saved_embedding_location = os.path.join( base_location, "logs_mixed_phonemes/logs_highway_net/logs/embeddings_batch"  )
 
-if dataset == "MAILABS":
-  trim = True
-  mag_num_feats = 401
-  train = "train_cleaned_lambda.csv"
-  val = "val_cleaned.csv"
-elif dataset == "LJ":
-  trim = False
-  mag_num_feats = 513
-  train = "train_cleaned_lambda.csv"
-  val = "val_cleaned.csv"
-else:
-  raise ValueError("Unknown dataset")
+# Sound features
+trim = False
+mag_num_feats = 513
+train = "train_cleaned_lambda.csv"
+val = "val_cleaned.csv"
+infer = "phoneme_model_infer.csv"
 
 exp_mag = False
 if output_type == "magnitude":
@@ -54,8 +51,8 @@ else:
   raise ValueError("Unknown param for output_type")
 
 base_params = {
-  "save_embeddings": True,
-
+	"save_embeddings": save_embeddings,
+	
   "random_seed": 0,
   "use_horovod": False,
   "num_gpus": 1,
@@ -77,10 +74,10 @@ base_params = {
   "lr_policy": exp_decay,
   "lr_policy_params": {
     "learning_rate": 1e-3,
-    "decay_steps": 5000,
+    "decay_steps": 15000,
     "decay_rate": 0.1,
     "use_staircase_decay": False,
-    "begin_decay_at": 15000,
+    "begin_decay_at": 55000,
     "min_lr": 1e-5,
   },
   "dtype": tf.float32,
@@ -94,7 +91,9 @@ base_params = {
 
   "encoder": Tacotron2Encoder,
   "encoder_params": {
-		"save_embeddings": True,
+		"save_embeddings": save_embeddings,
+		"use_saved_embedding": use_saved_embedding,
+
     "cnn_dropout_prob": 0.5,
     "rnn_dropout_prob": 0.,
     'src_emb_size': 512,
@@ -220,11 +219,12 @@ base_params = {
 
   "data_layer": Text2SpeechDataLayer,
   "data_layer_params": {
-    "save_embeddings": True,
-		"use_npy_wavs": False,
-		"use_phonemes": True,
-
-    "dataset": dataset,
+    "save_embeddings": save_embeddings,
+		"use_npy_wavs": use_npy_wavs,
+		"use_phonemes": use_phonemes,
+		"use_saved_embedding": use_saved_embedding,
+		"saved_embedding_location": saved_embedding_location,
+		
     "num_audio_features": num_audio_features,
     "output_type": output_type,
     "vocab_file": "open_seq2seq/test_utils/vocab_tts.txt",
@@ -260,7 +260,7 @@ eval_params = {
     ],
     "duration_max":10000,
     "duration_min":0,
-    "shuffle": False,
+    "shuffle": True,
     "style_input": "wav"
   },
 }

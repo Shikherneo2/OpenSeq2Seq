@@ -5,6 +5,7 @@ from six.moves import range
 
 import inspect
 
+import numpy as np
 import tensorflow as tf
 from tensorflow.contrib.cudnn_rnn.python.ops import cudnn_rnn_ops
 from tensorflow.python.framework import ops
@@ -50,7 +51,8 @@ class Tacotron2Encoder(Encoder):
             'zoneout_prob': float,
             'style_embedding_enable': bool,
             'style_embedding_params': dict,
-            "save_embeddings": bool
+            "save_embeddings": bool,
+            "use_saved_embedding": bool
         }
     )
 
@@ -208,11 +210,16 @@ class Tacotron2Encoder(Encoder):
         if ( self._model.get_data_layer().params.get("style_input", None) == "wav" ):
           style_spec = input_dict['source_tensors'][2]
           style_len = input_dict['source_tensors'][3]
-          style_embedding = self._embed_style(style_spec, style_len)
+          
+          if self.params["use_saved_embedding"]:
+            style_embedding = tf.reshape( input_dict['source_tensors'][5], (tf.shape(embedded_inputs)[0], 512))
+          else:
+            style_embedding = self._embed_style(style_spec, style_len)
         else:
           raise ValueError("The data layer's style input parameter must be set.")
-
-        unmodified_style_embedding = style_embedding
+        
+        if self.params["save_embeddings"]:
+          unmodified_style_embedding = style_embedding
         style_embedding = tf.expand_dims(style_embedding, 1)
         style_embedding = tf.tile(
             style_embedding,
