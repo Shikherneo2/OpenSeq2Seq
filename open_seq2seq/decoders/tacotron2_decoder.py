@@ -11,7 +11,7 @@ from tensorflow.python.framework import ops
 from open_seq2seq.parts.rnns.utils import single_cell
 from open_seq2seq.parts.rnns.attention_wrapper import BahdanauAttention, \
                                                  LocationSensitiveAttention, \
-                                                 AttentionWrapper
+                                                 AttentionWrapper, GravesAttention
 from open_seq2seq.parts.tacotron.tacotron_helper import TacotronHelper, \
                                                         TacotronTrainingHelper
 from open_seq2seq.parts.tacotron.tacotron_decoder import TacotronDecoder
@@ -250,6 +250,15 @@ class Tacotron2Decoder(Decoder):
             probability_fn=tf.nn.softmax,
             dtype=tf.get_variable_scope().dtype
         )
+      elif self.params['attention_type'] == 'graves':
+        attention_mechanism = GravesAttention(
+                num_units = attention_depth,
+                memory = encoder_outputs,
+                memory_sequence_length = encoder_sequence_length,
+                probability_fn = tf.nn.softmax,
+                training = (self._mode == "train"),
+                dtype = tf.get_variable_scope().dtype,
+              )
       else:
         raise ValueError('Unknown Attention Type')
       return attention_mechanism

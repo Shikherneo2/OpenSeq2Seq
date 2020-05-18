@@ -11,24 +11,24 @@ from open_seq2seq.optimizers.lr_policies import fixed_lr, transformer_policy, ex
 
 base_model = Text2SpeechTacotron
 
-batch_size = 12
+batch_size = 1
 output_type = "mel"
 base_location = "/home/sdevgupta/mine/OpenSeq2Seq"
 dataset_location = os.path.join( base_location, "dataset/" )
 logdir_location = os.path.join( base_location, "logs_mixed_phonemes/logs_highway_net/logs")
 
-save_embeddings = False
+save_embeddings = True
 use_npy_wavs = False
 use_phonemes = True
-use_saved_embedding = True
-saved_embedding_location = os.path.join( base_location, "logs_mixed_phonemes/logs_highway_net/logs/embeddings_batch"  )
+use_saved_embedding = False
+saved_embedding_location = os.path.join( base_location, "logs_mixed_phonemes/logs_highway_net/logs/train_text2_style_dataset_60K_single_batch"  )
 
 # Sound features
 trim = False
 mag_num_feats = 513
 train = "train_cleaned_lambda.csv"
 val = "val_cleaned.csv"
-infer = "phoneme_model_infer.csv"
+infer = "/home/sdevgupta/mine/OpenSeq2Seq/dataset/embeddings_infer_dataset_for_training_local.csv"
 
 exp_mag = False
 if output_type == "magnitude":

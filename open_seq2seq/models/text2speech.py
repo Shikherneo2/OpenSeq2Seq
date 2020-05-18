@@ -365,7 +365,7 @@ class Text2Speech(EncoderDecoderModel):
           stop_tokens_sample = stop_tokens[j]
 
           specs = [predicted_final_spec]
-          np.save( os.path.join(self.params["logdir"], "mel-"+str(i * batch_size + j)+".npy"), predicted_final_spec)
+          # np.save( os.path.join(self.params["logdir"], "mel-"+str(i * batch_size + j)+".npy"), predicted_final_spec)
           titles = ["final spectrogram"]
           audio_length = sequence_lengths[j]
 
