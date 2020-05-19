@@ -95,11 +95,11 @@ def plot_spectrograms(
     return summary
   else:
     if append:
-      name = '{}/Output_step{}_{}_{}.png'.format(
-          logdir, train_step, number, append
+      name = '{}/Output_step_{}_{}.png'.format(
+          logdir, number, append
       )
     else:
-      name = '{}/Output_step{}_{}.png'.format(logdir, train_step, number)
+      name = '{}/Output_step_{}.png'.format(logdir, number)
     if logdir[0] != '/':
       name = "./" + name
     # save
@@ -165,7 +165,7 @@ def save_audio(
     summary = tf.Summary.Value(tag=tag, audio=summary)
     return summary
   elif save_format == "disk":
-    file_name = '{}/sample_step{}_{}_{}.wav'.format(logdir, step, number, mode)
+    file_name = '{}/sample_step_{}_{}.wav'.format(logdir, number, mode)
     if logdir[0] != '/':
       file_name = "./" + file_name
     write(file_name, sampling_rate, signal)
@@ -337,7 +337,7 @@ class Text2Speech(EncoderDecoderModel):
 
     raise NotImplementedError()
 
-  def finalize_inference(self, results_per_batch, output_file):
+  def finalize_inference(self, results_per_batch, output_file=None):
     if self._params["save_embeddings"]:
       for sample in results_per_batch:
         input_values = sample[0]["source_tensors"]
@@ -353,6 +353,7 @@ class Text2Speech(EncoderDecoderModel):
     else:
       batch_size = len(results_per_batch[0][0]["source_tensors"][0])
       for i, sample in enumerate(results_per_batch):
+        input_values = sample[0]["source_tensors"]
         output_values = sample[1]
         predicted_final_specs = output_values[1]
         attention_mask = output_values[2]
@@ -363,7 +364,9 @@ class Text2Speech(EncoderDecoderModel):
           predicted_final_spec = predicted_final_specs[j]
           attention_mask_sample = attention_mask[j]
           stop_tokens_sample = stop_tokens[j]
-
+          
+          output_file_id = input_values[4][j][0]
+          
           specs = [predicted_final_spec]
           # np.save( os.path.join(self.params["logdir"], "mel-"+str(i * batch_size + j)+".npy"), predicted_final_spec)
           titles = ["final spectrogram"]
@@ -372,6 +375,7 @@ class Text2Speech(EncoderDecoderModel):
           alignment_specs, alignment_titles = self.get_alignments(attention_mask_sample)
           specs += alignment_specs
           titles += alignment_titles
+
 
           if "mel" in self.get_data_layer().params["output_type"]:
             mag_spec = self.get_data_layer().get_magnitude_spec(predicted_final_spec)
@@ -384,43 +388,43 @@ class Text2Speech(EncoderDecoderModel):
             titles.append("mag spectrogram from mel basis")
             specs.append(output_values[5][j])
             titles.append("mag spectrogram from proj layer")
-            np.save( os.path.join(self.params["logdir"], "mag-"+str(i * batch_size + j)+".npy"), output_values[5][j])
+            np.save( os.path.join(self.params["logdir"], "mag-"+str(output_file_id)+".npy"), output_values[5][j])
 
-          im_summary = plot_spectrograms(
+          plot_spectrograms(
               specs,
               titles,
               stop_tokens_sample,
               audio_length,
               self.params["logdir"],
               0,
-              number=i * batch_size + j,
+              number=output_file_id,
               append="infer"
           )
 
           if audio_length > 2:
             if "both" in self.get_data_layer().params["output_type"]:
               predicted_mag_spec = output_values[5][j][:audio_length - 1, :]
-              wav_summary = save_audio(
+              save_audio(
                 predicted_mag_spec,
                 self.params["logdir"],
                 0,
                 n_fft=self.get_data_layer().n_fft,
                 sampling_rate=self.get_data_layer().sampling_rate,
                 mode="infer_mag",
-                number=i * batch_size + j,
+                number=output_file_id,
                 save_format="disk",
                 max_normalization=self.get_data_layer().max_normalization
               )
             predicted_final_spec = predicted_final_spec[:audio_length - 1, :]
             predicted_final_spec = self.get_data_layer().get_magnitude_spec(predicted_final_spec, is_mel=True)
-            wav_summary = save_audio(
+            save_audio(
                 predicted_final_spec,
                 self.params["logdir"],
                 0,
                 n_fft=self.get_data_layer().n_fft,
                 sampling_rate=self.get_data_layer().sampling_rate,
                 mode="infer",
-                number=i * batch_size + j,
+                number=output_file_id,
                 save_format="disk",
                 max_normalization=self.get_data_layer().max_normalization
             )

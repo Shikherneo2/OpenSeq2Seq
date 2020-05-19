@@ -67,6 +67,7 @@ def text_to_sequence( text, p=0.0 ):
         List of integers corresponding to the symbols in the text
     '''
     text = text.lower()
+    text = text.replace("'", "")
     if p >= 0:
         text = mix_pronunciation(text, p)
     

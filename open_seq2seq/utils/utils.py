@@ -190,7 +190,8 @@ def iterate_data(model, sess, compute_loss, mode, verbose, num_steps=None):
       if mode == 'eval':
         results_per_batch.append(model.evaluate(inputs, outputs))
       elif mode == 'infer':
-        results_per_batch.append(model.infer(inputs, outputs))
+        # results_per_batch.append(model.infer(inputs, outputs))
+        model.finalize_inference( [model.infer(inputs, outputs)] )
       else:
         raise ValueError("Unknown mode: {}".format(mode))
 

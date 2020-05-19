@@ -95,7 +95,7 @@ class Tacotron2Decoder(Decoder):
     return dict(
         Decoder.get_required_params(), **{
             'attention_layer_size': int,
-            'attention_type': ['bahdanau', 'location', None],
+            'attention_type': ['bahdanau', 'location', "graves", None],
             'decoder_cell_units': int,
             'decoder_cell_type': None,
             'decoder_layers': int,
@@ -493,7 +493,8 @@ class Tacotron2Decoder(Decoder):
     if regularizer and training:
       vars_to_regularize = []
       vars_to_regularize += attentive_cell.trainable_variables
-      vars_to_regularize += attention_mechanism.memory_layer.trainable_variables
+      if( attention_mechanism.memory_layer is not None ):
+        vars_to_regularize += attention_mechanism.memory_layer.trainable_variables
       vars_to_regularize += output_projection_layer.trainable_variables
       vars_to_regularize += stop_token_projection_layer.trainable_variables
 
