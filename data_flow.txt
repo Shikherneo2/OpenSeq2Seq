@@ -1,0 +1,13 @@
+1. Run inference on Text2Style. Saved at <t2s_embedding_dataset>. Using dataset file - <infer_embedding_dataset>
+2. Run Text2Style/create_dataset_file.py <infer_embedding_dataset> <t2s_embedding_dataset> <embedding_dataset_file_for_gst_tacotron>
+3. Run inference/training in OpenSeq2Seq with embedding_dataset_file_for_gst_tacotron
+
+
+Test sentences
+1. Run Text2Style/create_test_sentences_deepvoice3.py to create <test_sentences_embeddings>. Takes a reference voice as input.
+2. Run OpenSeq2Seq with use_saved_embeddings=true, updated saved_embedding_location, and infer testfile = <test_sentences_embeddings>
+
+
+Text2Style
+1. Uses npy filenames by replacing wav_filename in input dataset filename with _. eg harry_potter/01-00009.wav with harry_potter_01-00009.npy
+2. When inferencing, the output are saved at logs/infered_embedding. OpenSeq2Seq looks at teh folder, and associates a text sentence with embed with the fileid.
