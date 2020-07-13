@@ -1,5 +1,6 @@
 # pylint: skip-file
 import os
+import argparse
 import tensorflow as tf
 from open_seq2seq.models import Text2SpeechTacotron
 from open_seq2seq.encoders import Tacotron2Encoder
@@ -11,7 +12,7 @@ from open_seq2seq.optimizers.lr_policies import fixed_lr, transformer_policy, ex
 
 base_model = Text2SpeechTacotron
 
-batch_size = 12
+batch_size = 1
 output_type = "mel"
 base_location = "/home/sdevgupta/mine/OpenSeq2Seq"
 dataset_location = os.path.join( base_location, "dataset/" )
@@ -20,9 +21,10 @@ logdir_location = os.path.join( base_location, "logs_mixed_phonemes/logs_highway
 save_embeddings = False
 use_npy_wavs = False
 use_phonemes = True
-use_saved_embedding = False
+use_saved_embedding = True
+save_all_inference_outputs = False # If true, also saves mels and alignment/spectrogram plots
 # saved_embedding_location = os.path.join( base_location, "logs_mixed_phonemes/logs_highway_net/logs/val_text2_style_dataset_60K_single_batch"  )
-saved_embedding_location = "/home/sdevgupta/mine/Text2Style/logs_mixed_phoneme_tacotron/infered_embeddings"
+saved_embedding_location = "/home/sdevgupta/mine/Text2Style/logs_reduced_vocab/infered_embeddings"
 
 # Sound features
 trim = False
@@ -53,8 +55,9 @@ else:
   raise ValueError("Unknown param for output_type")
 
 base_params = {
-	"save_embeddings": save_embeddings,
-	
+  "verbose_inference": save_all_inference_outputs,
+  "save_embeddings": save_embeddings,
+  
   "random_seed": 0,
   "use_horovod": False,
   "num_gpus": 1,
@@ -93,8 +96,8 @@ base_params = {
 
   "encoder": Tacotron2Encoder,
   "encoder_params": {
-		"save_embeddings": save_embeddings,
-		"use_saved_embedding": use_saved_embedding,
+    "save_embeddings": save_embeddings,
+    "use_saved_embedding": use_saved_embedding,
 
     "cnn_dropout_prob": 0.5,
     "rnn_dropout_prob": 0.,
@@ -222,11 +225,11 @@ base_params = {
   "data_layer": Text2SpeechDataLayer,
   "data_layer_params": {
     "save_embeddings": save_embeddings,
-		"use_npy_wavs": use_npy_wavs,
-		"use_phonemes": use_phonemes,
-		"use_saved_embedding": use_saved_embedding,
-		"saved_embedding_location": saved_embedding_location,
-		
+    "use_npy_wavs": use_npy_wavs,
+    "use_phonemes": use_phonemes,
+    "use_saved_embedding": use_saved_embedding,
+    "saved_embedding_location": saved_embedding_location,
+    
     "num_audio_features": num_audio_features,
     "output_type": output_type,
     "vocab_file": "open_seq2seq/test_utils/vocab_tts.txt",
@@ -270,8 +273,8 @@ eval_params = {
 infer_params = {
   "data_layer_params": {
     "dataset_files": [
-			os.path.join(dataset_location, infer),
-		],
+      os.path.join(dataset_location, infer),
+    ],
     "duration_max":10000,
     "duration_min":0,
     "shuffle": False,

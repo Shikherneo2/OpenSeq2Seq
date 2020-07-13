@@ -213,6 +213,8 @@ class Tacotron2Encoder(Encoder):
           
           if self.params["use_saved_embedding"]:
             style_embedding = tf.reshape( input_dict['source_tensors'][5], (tf.shape(embedded_inputs)[0], 512))
+            # style_embedding = tf.reshape( tf.cast(np.load("/home/sdevgupta/mine/OpenSeq2Seq/gmm_means_tsne5.npy")[0], tf.float32), (1, 512))
+            # style_embedding = tf.tile( style_embedding, [tf.shape(embedded_inputs)[0], 1] )
           else:
             style_embedding = self._embed_style(style_spec, style_len)
         else:

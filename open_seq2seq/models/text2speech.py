@@ -337,7 +337,7 @@ class Text2Speech(EncoderDecoderModel):
 
     raise NotImplementedError()
 
-  def finalize_inference(self, results_per_batch, output_file=None):
+  def finalize_inference(self, results_per_batch, verbose=False, output_file=None):
     if self._params["save_embeddings"]:
       for sample in results_per_batch:
         input_values = sample[0]["source_tensors"]
@@ -368,7 +368,6 @@ class Text2Speech(EncoderDecoderModel):
           output_file_id = input_values[4][j][0]
           
           specs = [predicted_final_spec]
-          # np.save( os.path.join(self.params["logdir"], "mel-"+str(i * batch_size + j)+".npy"), predicted_final_spec)
           titles = ["final spectrogram"]
           audio_length = sequence_lengths[j]
 
@@ -390,16 +389,18 @@ class Text2Speech(EncoderDecoderModel):
             titles.append("mag spectrogram from proj layer")
             np.save( os.path.join(self.params["logdir"], "mag-"+str(output_file_id)+".npy"), output_values[5][j])
 
-          plot_spectrograms(
-              specs,
-              titles,
-              stop_tokens_sample,
-              audio_length,
-              self.params["logdir"],
-              0,
-              number=output_file_id,
-              append="infer"
-          )
+          if( verbose ):
+            np.save( os.path.join(self.params["logdir"], "mel-"+str(output_file_id)+".npy"), predicted_final_spec)
+            plot_spectrograms(
+                specs,
+                titles,
+                stop_tokens_sample,
+                audio_length,
+                self.params["logdir"],
+                0,
+                number=output_file_id,
+                append="infer"
+            )
 
           if audio_length > 2:
             if "both" in self.get_data_layer().params["output_type"]:

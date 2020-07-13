@@ -92,7 +92,7 @@ def clip_last_batch(last_batch, true_size):
   return last_batch_clipped
 
 
-def iterate_data(model, sess, compute_loss, mode, verbose, num_steps=None):
+def iterate_data(model, sess, compute_loss, mode, verbose, detailed_inference_outputs=False, num_steps=None):
   total_time = 0.0
   bench_start = model.params.get('bench_start', 10)
   results_per_batch = []
@@ -190,8 +190,7 @@ def iterate_data(model, sess, compute_loss, mode, verbose, num_steps=None):
       if mode == 'eval':
         results_per_batch.append(model.evaluate(inputs, outputs))
       elif mode == 'infer':
-        # results_per_batch.append(model.infer(inputs, outputs))
-        model.finalize_inference( [model.infer(inputs, outputs)] )
+        model.finalize_inference( [model.infer(inputs, outputs)], verbose=detailed_inference_outputs )
       else:
         raise ValueError("Unknown mode: {}".format(mode))
 
@@ -235,14 +234,14 @@ def iterate_data(model, sess, compute_loss, mode, verbose, num_steps=None):
     return results_per_batch
 
 
-def get_results_for_epoch(model, sess, compute_loss, mode, verbose=False):
+def get_results_for_epoch(model, sess, compute_loss, mode, verbose=False, detailed_inference_outputs=False):
   if compute_loss:
     results_per_batch, total_loss, total_samples = iterate_data(
-        model, sess, compute_loss, mode, verbose,
+        model, sess, compute_loss, mode, verbose, detailed_inference_outputs=detailed_inference_outputs,
     )
   else:
     results_per_batch = iterate_data(
-        model, sess, compute_loss, mode, verbose,
+        model, sess, compute_loss, mode, verbose, detailed_inference_outputs=detailed_inference_outputs,
     )
 
   if compute_loss:

@@ -109,6 +109,7 @@ class Model:
             # Parameters for XLA
             'use_xla_jit': bool,
             "save_embeddings": bool,
+						"verbose_inference": bool
         }
 
     def __init__(self, params, mode="train", hvd=None):
@@ -679,7 +680,7 @@ class Model:
                 self._num_objects_per_step = [self._get_num_objects_per_step(worker_id)
                                               for worker_id in range(self.num_gpus)]
                 results_per_batch = iterate_data(
-                    self, tf_sess, compute_loss=False, mode='infer', verbose=False,
+                    self, tf_sess, compute_loss=False, mode='infer', verbose=False, detailed_inference_outputs=self._params["verbose_inference"],
                     num_steps=num_iterations
                 )
                 frozen_graph = trt.calib_graph_to_infer_graph(calib_graph)

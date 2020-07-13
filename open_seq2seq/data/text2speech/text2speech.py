@@ -327,6 +327,7 @@ class Text2SpeechDataLayer(DataLayer):
             tf.cast(1., dtype=self.params['dtype']), 0
           ),
         )
+
       elif ( self.params['mode'] == "infer" and self.params["use_saved_embedding"]):
         self._dataset = self._dataset.map(
           lambda line: tf.py_func(
@@ -362,6 +363,7 @@ class Text2SpeechDataLayer(DataLayer):
             tf.cast(1., dtype=self.params['dtype']), 0, 0, tf.cast(1., dtype=self.params['dtype'])
           ),
         )
+        
       else:
         self._dataset = self._dataset.map(
             lambda line: tf.py_func(

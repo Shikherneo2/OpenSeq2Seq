@@ -219,7 +219,7 @@ def train(train_model, eval_model=None, debug_port=None, custom_hooks=None):
       deco_print("Not enough steps for benchmarking")
 
 
-def restore_and_get_results(model, checkpoint, mode):
+def restore_and_get_results(model, checkpoint, mode, detailed_inference_outputs):
   if not model.params.get("use_trt", False):
     # Checkpoint is restored prior to freezing graph when using TRT
     saver = tf.train.Saver()
@@ -239,19 +239,18 @@ def restore_and_get_results(model, checkpoint, mode):
         saver = tf.train.Saver()
         saver.restore(sess, checkpoint)
     results_per_batch = get_results_for_epoch(
-        model, sess, mode=mode, compute_loss=False, verbose=True,
+        model, sess, mode=mode, compute_loss=False, verbose=True, detailed_inference_outputs=detailed_inference_outputs
     )
   return results_per_batch
 
 
 def infer(model, checkpoint, output_file):
-  results_per_batch = restore_and_get_results(model, checkpoint, mode="infer")
+  results_per_batch = restore_and_get_results(model, checkpoint, mode="infer", detailed_inference_outputs=model.params.get("verbose_inference", False))
   if not model.on_horovod or model.hvd.rank() == 0:
-    # model.finalize_inference(results_per_batch, output_file)
     deco_print("Finished inference")
 
 def evaluate(model, checkpoint):
-  results_per_batch = restore_and_get_results(model, checkpoint, mode="eval")
+  results_per_batch = restore_and_get_results(model, checkpoint, mode="eval", detailed_inference_outputs=False)
   if not model.on_horovod or model.hvd.rank() == 0:
     eval_dict = model.finalize_evaluation(results_per_batch)
     deco_print("Finished evaluation")

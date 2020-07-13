@@ -201,7 +201,7 @@ class RunEvaluationHook(tf.train.SessionRunHook):
       deco_print("Running evaluation on a validation set:")
 
     results_per_batch, total_loss = get_results_for_epoch(
-        self._model, run_context.session, mode="eval", compute_loss=True,
+        self._model, run_context.session, mode="eval", compute_loss=True, detailed_inference_outputs=False,
     )
 
 

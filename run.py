@@ -22,8 +22,7 @@ if hasattr(tf.compat, 'v1'):
 
 def main():
 	# Parse args and create config
-	args, base_config, base_model, config_module = get_base_config(
-		sys.argv[1:])
+	args, base_config, base_model, config_module = get_base_config( sys.argv[1:] )
 
 	if args.mode == "interactive_infer":
 		raise ValueError(
