@@ -145,7 +145,7 @@ class EncoderDecoderModel(Model):
 
     source_tensors = input_tensors['source_tensors']
     
-    if self.mode == "train" or self.mode == "eval":
+    if self.mode == "train" or self.mode == "eval" or (self.mode == "infer" and self.params["gta_force_inference"] == True):
       if 'target_tensors' not in input_tensors:
         raise ValueError('Input tensors should contain "target_tensors" key when mode != "infer"')
       if not isinstance(input_tensors['target_tensors'], list):
@@ -161,7 +161,7 @@ class EncoderDecoderModel(Model):
       decoder_input = {
         "encoder_output": encoder_output
       }
-      if self.mode == "train" or self.mode == "eval":
+      if self.mode == "train" or self.mode == "eval" or (self.mode == "infer" and self.params["gta_force_inference"] == True):
         decoder_input['target_tensors'] = target_tensors
       
       decoder_output = self.decoder.decode(input_dict=decoder_input)

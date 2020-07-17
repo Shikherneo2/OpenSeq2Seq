@@ -210,6 +210,10 @@ class Tacotron2Decoder(Decoder):
     super(Tacotron2Decoder, self).__init__(params, model, name, mode)
     self._model = model
     self._n_feats = self._model.get_data_layer().params['num_audio_features']
+    self._gta_forcing = self._model._params["gta_force_inference"]
+    print("GTA forcing")
+    print(self._gta_forcing)
+
     if "both" in self._model.get_data_layer().params['output_type']:
       self._both = True
       if not self.params.get('enable_postnet', True):
@@ -304,11 +308,13 @@ class Tacotron2Decoder(Decoder):
     """
     encoder_outputs = input_dict['encoder_output']['outputs']
     enc_src_lengths = input_dict['encoder_output']['src_length']
-    if self._mode == "train":
-      spec = input_dict['target_tensors'][0] if 'target_tensors' in \
-                                                    input_dict else None
-      spec_length = input_dict['target_tensors'][2] if 'target_tensors' in \
-                                                    input_dict else None
+    if self._mode == "train" or (self._mode=="infer" and self._gta_forcing==True):
+      spec = input_dict['target_tensors'][0]
+      spec_length = input_dict['target_tensors'][2]
+    else:
+      spec = None
+      spec_length = None
+      
     _batch_size = encoder_outputs.get_shape().as_list()[0]
 
     training = (self._mode == "train")
@@ -401,7 +407,9 @@ class Tacotron2Decoder(Decoder):
       helper = TacotronHelper(
           inputs=inputs,
           prenet=None,
-          mask_decoder_sequence=self.params.get("mask_decoder_sequence", True)
+          mask_decoder_sequence=self.params.get("mask_decoder_sequence", True),
+          gta_mels=spec,
+          gta_mel_lengths=spec_length,
       )
     else:
       raise ValueError("Unknown mode for decoder: {}".format(self._mode))

@@ -145,7 +145,9 @@ class TacotronHelper(Helper):
       time_major=False,
       sample_ids_shape=None,
       sample_ids_dtype=None,
-      mask_decoder_sequence=None
+      mask_decoder_sequence=None,
+      gta_mels=None,
+      gta_mel_lengths=None,
   ):
     """Initializer.
 
@@ -164,6 +166,20 @@ class TacotronHelper(Helper):
     self._sample_ids_dtype = sample_ids_dtype or dtypes.int32
     self._batch_size = inputs.get_shape()[0]
     self._mask_decoder_sequence = mask_decoder_sequence
+    
+    if ( gta_mels is None and gta_mels is not None) and ( gta_mels is not None and gta_mels is None):
+      raise Exception( "If GTA forcing inference, both gta_mels and gta_mel_lengths should be set." )
+
+    # Feed every r-th target frame as input
+    # self.gta_mels = gta_mels[:, r-1::r, :]
+    # r = self.reduction_factor -- Seems to be 1 in this implementation, so no changes necessary
+    if gta_mels is not None:
+      self.gta_mels = gta_mels
+      self._lengths = tf.shape(self.gta_mels)[1]
+      self._lengths = gta_mel_lengths
+      self.gta = True
+    else:
+      self.gta = False
 
     if not time_major:
       inputs = nest.map_structure(_transpose_batch_time, inputs)
@@ -194,6 +210,7 @@ class TacotronHelper(Helper):
   def sample(self, time, outputs, state, name=None):
     # Fully deterministic, output should already be projected
     pass
+  
   def next_inputs(
       self,
       time,
@@ -214,13 +231,26 @@ class TacotronHelper(Helper):
       finished = array_ops.tile([False], [self._batch_size])
     all_finished = math_ops.reduce_all(finished)
 
-    def get_next_input(out):
-      if self._prenet is not None:
-        out = self._prenet(out)
-      return out
+    def apply_gta(outputs):
+      if self.gta == True:
+        return self.gta_mels[:,time,:]
+      else:
+        if self._prenet is not None:
+          outputs = self._prenet(outputs)
+        return outputs
 
+    if self.gta == True:
+      all_finished = math_ops.reduce_all( time+1 >= self._lengths )
+      # Stop whichever happens first -- we reach the end of the ground truth, or the stop prediction network says we should stop.
+      # all_finished = control_flow_ops.cond(
+      #   all_finished_gta,
+      #   lambda: True,
+      #   lambda: all_finished
+      # )
+      
     next_inputs = control_flow_ops.cond(
-        all_finished, lambda: self._start_inputs,
-        lambda: get_next_input(outputs)
+        all_finished, 
+        lambda: self._start_inputs,
+        lambda: apply_gta(outputs)
     )
     return (finished, next_inputs, state)

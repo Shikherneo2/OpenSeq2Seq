@@ -438,6 +438,10 @@ class Text2SpeechDataLayer(DataLayer):
         self._input_tensors["source_tensors"].append( file_id )
         if (self.params["use_saved_embedding"]):
           self._input_tensors["source_tensors"].append( embedding )
+        if self._model._params["gta_force_inference"] is True:
+          self._input_tensors['target_tensors'] = [
+            spec, stop_token_target, spec_length
+          ]	
       else:
         self._input_tensors['target_tensors'] = [
             spec, stop_token_target, spec_length

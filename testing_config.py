@@ -2,13 +2,12 @@
 import os
 import argparse
 import tensorflow as tf
-from open_seq2seq.models import Text2SpeechTacotron
+from open_seq2seq.losses import Text2SpeechLoss
 from open_seq2seq.encoders import Tacotron2Encoder
 from open_seq2seq.decoders import Tacotron2Decoder
 from open_seq2seq.data import Text2SpeechDataLayer
-from open_seq2seq.losses import Text2SpeechLoss
+from open_seq2seq.models import Text2SpeechTacotron
 from open_seq2seq.optimizers.lr_policies import fixed_lr, transformer_policy, exp_decay
-
 
 base_model = Text2SpeechTacotron
 
@@ -18,21 +17,30 @@ base_location = "/home/sdevgupta/mine/OpenSeq2Seq"
 dataset_location = os.path.join( base_location, "dataset/" )
 logdir_location = os.path.join( base_location, "logs_mixed_phonemes/logs_highway_net/logs")
 
-save_embeddings = False
+# Use GTA forcing in inference
+gta_force = False
+batch_size = 1 if gta_force else batch_size
+
+# Use npy of wavs instead of loading the wavs and decoding them
 use_npy_wavs = False
+# Use phonemes instead of raw characters
 use_phonemes = True
-use_saved_embedding = True
-save_all_inference_outputs = False # If true, also saves mels and alignment/spectrogram plots
+# Save the style embeddings generated.
+save_embeddings = False
+# Instead of calculating the embedding from the reference wavs, use these saved embeddings
+use_saved_embedding = False
+
+# If true, also saves mels and alignment/spectrogram plots
+save_all_inference_outputs = True 
 # saved_embedding_location = os.path.join( base_location, "logs_mixed_phonemes/logs_highway_net/logs/val_text2_style_dataset_60K_single_batch"  )
-saved_embedding_location = "/home/sdevgupta/mine/Text2Style/logs_reduced_vocab/infered_embeddings"
+saved_embedding_location = "/home/sdevgupta/mine/Text2Style/logs_mixed_phoneme_tacotron/infered_embeddings"
 
 # Sound features
 trim = False
 mag_num_feats = 513
 train = "train_cleaned_lambda.csv"
 val = "val_cleaned.csv"
-# infer = os.path.join( dataset_location, "phoneme_model_infer.csv" )
-infer = os.path.join( dataset_location, "test_sentences.csv")
+infer = os.path.join( dataset_location, "test_gta.csv")
 
 exp_mag = False
 if output_type == "magnitude":
@@ -57,6 +65,7 @@ else:
 base_params = {
   "verbose_inference": save_all_inference_outputs,
   "save_embeddings": save_embeddings,
+	"gta_force_inference": gta_force,
   
   "random_seed": 0,
   "use_horovod": False,
