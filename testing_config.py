@@ -18,7 +18,7 @@ dataset_location = os.path.join( base_location, "dataset/" )
 logdir_location = os.path.join( base_location, "logs_mixed_phonemes/logs_highway_net/logs")
 
 # Use GTA forcing in inference
-gta_force = False
+gta_force = True
 batch_size = 1 if gta_force else batch_size
 
 # Use npy of wavs instead of loading the wavs and decoding them
@@ -31,7 +31,10 @@ save_embeddings = False
 use_saved_embedding = False
 
 # If true, also saves mels and alignment/spectrogram plots
-save_all_inference_outputs = True 
+save_all_inference_outputs = False
+# Only saves mels
+save_mels = True
+
 # saved_embedding_location = os.path.join( base_location, "logs_mixed_phonemes/logs_highway_net/logs/val_text2_style_dataset_60K_single_batch"  )
 saved_embedding_location = "/home/sdevgupta/mine/Text2Style/logs_mixed_phoneme_tacotron/infered_embeddings"
 
@@ -40,7 +43,7 @@ trim = False
 mag_num_feats = 513
 train = "train_cleaned_lambda.csv"
 val = "val_cleaned.csv"
-infer = os.path.join( dataset_location, "test_gta.csv")
+infer = os.path.join( dataset_location, "dataset_for_training_local_no_As.csv")
 
 exp_mag = False
 if output_type == "magnitude":
@@ -64,6 +67,7 @@ else:
 
 base_params = {
   "verbose_inference": save_all_inference_outputs,
+	"save_mels": save_mels,
   "save_embeddings": save_embeddings,
 	"gta_force_inference": gta_force,
   

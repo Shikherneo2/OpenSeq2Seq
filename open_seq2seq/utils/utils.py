@@ -14,7 +14,7 @@ import subprocess
 import sys
 import time
 
-
+from tqdm import tqdm
 import numpy as np
 import six
 from six import string_types
@@ -92,7 +92,7 @@ def clip_last_batch(last_batch, true_size):
   return last_batch_clipped
 
 
-def iterate_data(model, sess, compute_loss, mode, verbose, detailed_inference_outputs=False, num_steps=None):
+def iterate_data(model, sess, compute_loss, mode, verbose, detailed_inference_outputs=False, save_mels=False, num_steps=None):
   total_time = 0.0
   bench_start = model.params.get('bench_start', 10)
   results_per_batch = []
@@ -136,7 +136,10 @@ def iterate_data(model, sess, compute_loss, mode, verbose, detailed_inference_ou
       ending = " on worker {}".format(model.hvd.rank())
     else:
       ending = ""
-
+  
+  batch_size = model.params.get("batch_size_per_gpu")
+  data_size = int(np.sum(np.ceil(np.array(dl_sizes) / batch_size)))
+  pbar = tqdm( total=data_size )
   while True:
     tm = time.time()
     fetches_vals = {}
@@ -190,18 +193,18 @@ def iterate_data(model, sess, compute_loss, mode, verbose, detailed_inference_ou
       if mode == 'eval':
         results_per_batch.append(model.evaluate(inputs, outputs))
       elif mode == 'infer':
-        model.finalize_inference( [model.infer(inputs, outputs)], verbose=detailed_inference_outputs )
+        model.finalize_inference( [model.infer(inputs, outputs)], verbose=detailed_inference_outputs, save_mels=save_mels )
       else:
         raise ValueError("Unknown mode: {}".format(mode))
 
     if verbose:
       if size_defined:
-        data_size = int(np.sum(np.ceil(np.array(dl_sizes) / batch_size)))
-        if step == 0 or len(fetches_vals) == 0 or \
-           (data_size > 10 and processed_batches % (data_size // 10) == 0):
-          deco_print("Processed {}/{} batches{}".format(
-              processed_batches, data_size, ending
-          ))
+        # data_size = int(np.sum(np.ceil(np.array(dl_sizes) / batch_size)))
+        # if step == 0 or len(fetches_vals) == 0 or (data_size > 10 and processed_batches % (data_size // 10) == 0):
+        #   deco_print("Processed {}/{} batches{}".format(
+        #       processed_batches, data_size, ending
+        #   ))
+        pbar.update( 1 )
       else:
         deco_print("Processed {} batches{}".format(processed_batches, ending),
                    end='\r')
@@ -227,21 +230,21 @@ def iterate_data(model, sess, compute_loss, mode, verbose, detailed_inference_ou
     else:
       deco_print("Not enough steps for benchmarking{}".format(ending))
 
-
+  pbar.close()
   if compute_loss:
     return results_per_batch, total_loss, np.sum(total_samples)
   else:
     return results_per_batch
 
 
-def get_results_for_epoch(model, sess, compute_loss, mode, verbose=False, detailed_inference_outputs=False):
+def get_results_for_epoch(model, sess, compute_loss, mode, verbose=False, detailed_inference_outputs=False, save_mels=False):
   if compute_loss:
     results_per_batch, total_loss, total_samples = iterate_data(
-        model, sess, compute_loss, mode, verbose, detailed_inference_outputs=detailed_inference_outputs,
+        model, sess, compute_loss, mode, verbose, detailed_inference_outputs=detailed_inference_outputs, save_mels=save_mels
     )
   else:
     results_per_batch = iterate_data(
-        model, sess, compute_loss, mode, verbose, detailed_inference_outputs=detailed_inference_outputs,
+        model, sess, compute_loss, mode, verbose, detailed_inference_outputs=detailed_inference_outputs, save_mels=save_mels
     )
 
   if compute_loss:

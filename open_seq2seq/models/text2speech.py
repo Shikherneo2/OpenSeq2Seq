@@ -337,7 +337,7 @@ class Text2Speech(EncoderDecoderModel):
 
     raise NotImplementedError()
 
-  def finalize_inference(self, results_per_batch, verbose=False, output_file=None):
+  def finalize_inference(self, results_per_batch, verbose=False, save_mels=False, output_file=None):
     if self._params["save_embeddings"]:
       for sample in results_per_batch:
         input_values = sample[0]["source_tensors"]
@@ -349,6 +349,18 @@ class Text2Speech(EncoderDecoderModel):
           output_filename = "embed-"+ str(output_file_id) + ".npy"
 
           np.save( os.path.join(self.params["logdir"], "embeddings", output_filename), embeddings[j] )
+          
+    elif save_mels:
+      batch_size = len(results_per_batch[0][0]["source_tensors"][0])
+      for i, sample in enumerate(results_per_batch):
+        input_values = sample[0]["source_tensors"]
+        output_values = sample[1]
+        predicted_final_specs = output_values[1]
+
+        for j in range(len(predicted_final_specs)):
+          predicted_final_spec = predicted_final_specs[j]
+          output_file_id = input_values[4][j][0]
+          np.save( os.path.join(self.params["logdir"], "mels", "mel-"+str(output_file_id)+".npy"), predicted_final_spec)
 
     else:
       batch_size = len(results_per_batch[0][0]["source_tensors"][0])
@@ -374,7 +386,6 @@ class Text2Speech(EncoderDecoderModel):
           alignment_specs, alignment_titles = self.get_alignments(attention_mask_sample)
           specs += alignment_specs
           titles += alignment_titles
-
 
           if "mel" in self.get_data_layer().params["output_type"]:
             mag_spec = self.get_data_layer().get_magnitude_spec(predicted_final_spec)

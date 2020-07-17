@@ -110,6 +110,7 @@ class Model:
             'use_xla_jit': bool,
             "save_embeddings": bool,
 						"verbose_inference": bool,
+						'save_mels': bool,
 						'gta_force_inference': bool,
         }
 
