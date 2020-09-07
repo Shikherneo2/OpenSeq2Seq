@@ -62,115 +62,115 @@ else:
 
 base_params = {
   # "win_length": win_length,
-	# "hop_length": hop_length,
-	"save_embeddings": True,
-	"use_npy_wavs": True,
-	"use_phonemes":True,
-	"random_seed": 0,
-  "use_horovod": True,
-  "num_gpus": 8,
-  "num_epochs": 500,
+    # "hop_length": hop_length,
+    "save_embeddings": True,
+    "use_npy_wavs": True,
+    "use_phonemes":True,
+    "random_seed": 0,
+    "use_horovod": True,
+    "num_gpus": 8,
+    "num_epochs": 500,
 
-  "batch_size_per_gpu": batch_size,
+    "batch_size_per_gpu": batch_size,
 
-  "save_summaries_steps": 50,
-  "print_loss_steps": 50,
-  "print_samples_steps": 1000,
-  "eval_steps": 1000,
-  "save_checkpoint_steps": 1000,
-  "save_to_tensorboard": True,
-  "logdir": "/mydata/new_results",
-  "max_grad_norm":1.,
+    "save_summaries_steps": 50,
+    "print_loss_steps": 50,
+    "print_samples_steps": 1000,
+    "eval_steps": 1000,
+    "save_checkpoint_steps": 1000,
+    "save_to_tensorboard": True,
+    "logdir": "/mydata/new_results",
+    "max_grad_norm":1.,
 
-  "optimizer": "Adam",
-  "optimizer_params": {},
-  "lr_policy": exp_decay,
-  "lr_policy_params": {
-    "learning_rate": 1e-3,
-    "decay_steps": 10000,
-    "decay_rate": 0.1,
-    "use_staircase_decay": False,
-    "begin_decay_at": 20000,
-    "min_lr": 1e-5,
-  },
-  "dtype": tf.float32,
-  "regularizer": tf.contrib.layers.l2_regularizer,
-  "regularizer_params": {
-    'scale': 1e-6
-  },
-  "initializer": tf.contrib.layers.xavier_initializer,
+    "optimizer": "Adam",
+    "optimizer_params": {},
+    "lr_policy": exp_decay,
+    "lr_policy_params": {
+        "learning_rate": 1e-3,
+        "decay_steps": 10000,
+        "decay_rate": 0.1,
+        "use_staircase_decay": False,
+        "begin_decay_at": 20000,
+        "min_lr": 1e-5,
+    },
+    "dtype": tf.float32,
+    "regularizer": tf.contrib.layers.l2_regularizer,
+    "regularizer_params": {
+        'scale': 1e-6
+    },
+    "initializer": tf.contrib.layers.xavier_initializer,
 
-  "summaries": ['learning_rate', 'gradients', 'gradient_norm', 'larc_summaries'],
+    "summaries": ['learning_rate', 'gradients', 'gradient_norm', 'larc_summaries'],
 
 #   "summaries": ['learning_rate', 'variables', 'gradients', 'larc_summaries',
 #                 'variable_norm', 'gradient_norm', 'global_gradient_norm'],
 
-  "encoder": Tacotron2Encoder,
-  "encoder_params": {
-    "cnn_dropout_prob": 0.5,
-    "rnn_dropout_prob": 0.,
-    'src_emb_size': 512,
-    "conv_layers": [
-      {
-        "kernel_size": [5], "stride": [1],
-        "num_channels": 512, "padding": "SAME"
-      },
-      {
-        "kernel_size": [5], "stride": [1],
-        "num_channels": 512, "padding": "SAME"
-      },
-      {
-        "kernel_size": [5], "stride": [1],
-        "num_channels": 512, "padding": "SAME"
-      }
-    ],
-    "activation_fn": tf.nn.relu,
-
-    "num_rnn_layers": 1,
-    "rnn_cell_dim": 256,
-    "rnn_unidirectional": False,
-    "use_cudnn_rnn": True,
-    "rnn_type": tf.contrib.cudnn_rnn.CudnnLSTM,
-    "zoneout_prob": 0.,
-
-    "data_format": "channels_last",
-
-    "style_embedding_enable": True,
-    "style_embedding_params": {
-      "conv_layers": [
+    "encoder": Tacotron2Encoder,
+    "encoder_params": {
+        "cnn_dropout_prob": 0.5,
+        "rnn_dropout_prob": 0.,
+        'src_emb_size': 512,
+        "conv_layers": [
         {
-          "kernel_size": [3,3], "stride": [2,2],
-          "num_channels": 32, "padding": "SAME"
+            "kernel_size": [5], "stride": [1],
+            "num_channels": 512, "padding": "SAME"
         },
         {
-          "kernel_size": [3,3], "stride": [2,2],
-          "num_channels": 32, "padding": "SAME"
+            "kernel_size": [5], "stride": [1],
+            "num_channels": 512, "padding": "SAME"
         },
         {
-          "kernel_size": [3,3], "stride": [2,2],
-          "num_channels": 64, "padding": "SAME"
-        },
-        {
-          "kernel_size": [3,3], "stride": [2,2],
-          "num_channels": 64, "padding": "SAME"
-        },
-        {
-          "kernel_size": [3,3], "stride": [2,2],
-          "num_channels": 128, "padding": "SAME"
-        },
-        {
-          "kernel_size": [3,3], "stride": [2,2],
-          "num_channels": 128, "padding": "SAME"
+            "kernel_size": [5], "stride": [1],
+            "num_channels": 512, "padding": "SAME"
         }
-      ],
-      "num_rnn_layers": 1,
-      "rnn_cell_dim": 128,
-      "rnn_unidirectional": True,
-      "rnn_type": tf.nn.rnn_cell.GRUCell,
-      "emb_size": 512,
-      'attention_layer_size': 512,
-      "num_tokens": 32,
-      "num_heads": 0
+        ],
+        "activation_fn": tf.nn.relu,
+
+        "num_rnn_layers": 1,
+        "rnn_cell_dim": 256,
+        "rnn_unidirectional": False,
+        "use_cudnn_rnn": True,
+        "rnn_type": tf.contrib.cudnn_rnn.CudnnLSTM,
+        "zoneout_prob": 0.,
+
+        "data_format": "channels_last",
+
+        "style_embedding_enable": True,
+        "style_embedding_params": {
+        "conv_layers": [
+            {
+            "kernel_size": [3,3], "stride": [2,2],
+            "num_channels": 32, "padding": "SAME"
+            },
+            {
+            "kernel_size": [3,3], "stride": [2,2],
+            "num_channels": 32, "padding": "SAME"
+            },
+            {
+            "kernel_size": [3,3], "stride": [2,2],
+            "num_channels": 64, "padding": "SAME"
+            },
+            {
+            "kernel_size": [3,3], "stride": [2,2],
+            "num_channels": 64, "padding": "SAME"
+            },
+            {
+            "kernel_size": [3,3], "stride": [2,2],
+            "num_channels": 128, "padding": "SAME"
+            },
+            {
+            "kernel_size": [3,3], "stride": [2,2],
+            "num_channels": 128, "padding": "SAME"
+            }
+        ],
+        "num_rnn_layers": 1,
+        "rnn_cell_dim": 128,
+        "rnn_unidirectional": True,
+        "rnn_type": tf.nn.rnn_cell.GRUCell,
+        "emb_size": 512,
+        'attention_layer_size': 512,
+        "num_tokens": 32,
+        "num_heads": 0
     }
   },
 

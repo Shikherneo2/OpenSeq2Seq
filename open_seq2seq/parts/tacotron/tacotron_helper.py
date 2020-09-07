@@ -240,14 +240,14 @@ class TacotronHelper(Helper):
         return outputs
 
     if self.gta == True:
-      all_finished = math_ops.reduce_all( time+1 >= self._lengths )
+      all_finished = math_ops.reduce_all( time >= self._lengths )
       # Stop whichever happens first -- we reach the end of the ground truth, or the stop prediction network says we should stop.
       # all_finished = control_flow_ops.cond(
       #   all_finished_gta,
       #   lambda: True,
       #   lambda: all_finished
       # )
-      
+      finished = array_ops.tile([all_finished], [self._batch_size])  
     next_inputs = control_flow_ops.cond(
         all_finished, 
         lambda: self._start_inputs,

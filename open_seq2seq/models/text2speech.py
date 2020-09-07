@@ -342,7 +342,7 @@ class Text2Speech(EncoderDecoderModel):
       for sample in results_per_batch:
         input_values = sample[0]["source_tensors"]
         output_values = sample[1]
-        embeddings = output_values[6]
+        embeddings = output_values[0]
         
         for j in range(len(embeddings)):
           output_file_id = input_values[-1][j][0]
@@ -355,7 +355,7 @@ class Text2Speech(EncoderDecoderModel):
       for i, sample in enumerate(results_per_batch):
         input_values = sample[0]["source_tensors"]
         output_values = sample[1]
-        predicted_final_specs = output_values[1]
+        predicted_final_specs = output_values[0]
 
         for j in range(len(predicted_final_specs)):
           predicted_final_spec = predicted_final_specs[j]

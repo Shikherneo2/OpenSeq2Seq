@@ -11,35 +11,21 @@ from open_seq2seq.optimizers.lr_policies import fixed_lr, transformer_policy, ex
 
 base_model = Text2SpeechTacotron
 
-batch_size = 1
 output_type = "mel"
 base_location = "/home/sdevgupta/mine/OpenSeq2Seq"
 dataset_location = os.path.join( base_location, "dataset/" )
+# logdir_location = os.path.join( base_location, "logs_mixed_phonemes/logs_highway_net/logs")
 logdir_location = os.path.join( base_location, "/home/sdevgupta/mine/OpenSeq2Seq/ljspeech_catheryn_logs" )
-# logdir_location = "/home/sdevgupta/mine/OpenSeq2Seq/logs_mixed_phonemes/logs_highway_net/logs"
-
-# Use GTA forcing in inference
-gta_force = False
-batch_size = 1 if gta_force else batch_size
 
 # Use npy of wavs instead of loading the wavs and decoding them
 use_npy_wavs = True
 # Use phonemes instead of raw characters
 use_phonemes = True
-# Save the style embeddings generated.
-save_embeddings = False
 # Instead of calculating the embedding from the reference wavs, use these saved embeddings
-use_saved_embedding = True
-
-# If true, also saves mels and alignment/spectrogram plots
-save_all_inference_outputs = True
-# Only saves mels
-save_mels = False
+use_saved_embedding = False
 
 # saved_embedding_location = os.path.join( base_location, "logs_mixed_phonemes/logs_highway_net/logs/val_text2_style_dataset_60K_single_batch"  )
-# saved_embedding_location = "/home/sdevgupta/mine/OpenSeq2Seq/ljspeech_catheryn_logs/embeddings"
-saved_embedding_location = "/home/sdevgupta/mine/Text2Style/scaled_proper_normalization_l2_loss_not_linear/infered_embeddings/"
-
+saved_embedding_location = "/home/sdevgupta/mine/OpenSeq2Seq/ljspeech_catheryn_logs/embeddings"
 
 # Sound features
 trim = False
@@ -47,8 +33,8 @@ mag_num_feats = 513
 train = "train_cleaned_lambda.csv"
 val = "val_cleaned.csv"
 # infer = os.path.join( dataset_location, "test_embedding_creation.csv")
-infer = "/home/sdevgupta/mine/Text2Style/open_seq2seq/dataset/test_sentences_lj_combined.csv"
-#infer = os.path.join(dataset_location, "tt.csv")
+#infer = "/home/sdevgupta/mine/Text2Style/open_seq2seq/dataset/combined_dataset_for_text2style_training.csv"
+infer = "/home/sdevgupta/mine/data/cath_gta_rand_filelist_gta.txt"
 
 exp_mag = False
 if output_type == "magnitude":
@@ -71,17 +57,17 @@ else:
   raise ValueError("Unknown param for output_type")
 
 base_params = {
-  "verbose_inference": save_all_inference_outputs,
-	"save_mels": save_mels,
-  "save_embeddings": save_embeddings,
-	"gta_force_inference": gta_force,
+  "verbose_inference": False,
+	"save_mels": True,
+  "save_embeddings": False,
+	"gta_force_inference": True,
   
   "random_seed": 0,
   "use_horovod": False,
   "num_gpus": 1,
   "num_epochs": 1000,
 
-  "batch_size_per_gpu": batch_size,
+  "batch_size_per_gpu": 1,
 
   "save_summaries_steps": 50,
   "print_loss_steps": 50,
@@ -114,7 +100,7 @@ base_params = {
 
   "encoder": Tacotron2Encoder,
   "encoder_params": {
-    "save_embeddings": save_embeddings,
+    "save_embeddings": False,
     "use_saved_embedding": use_saved_embedding,
 
     "cnn_dropout_prob": 0.5,
@@ -242,7 +228,7 @@ base_params = {
 
   "data_layer": Text2SpeechDataLayer,
   "data_layer_params": {
-    "save_embeddings": save_embeddings,
+    "save_embeddings": False,
     "use_npy_wavs": use_npy_wavs,
     "use_phonemes": use_phonemes,
     "use_saved_embedding": use_saved_embedding,

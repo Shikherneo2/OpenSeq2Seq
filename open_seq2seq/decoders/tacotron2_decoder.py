@@ -211,8 +211,6 @@ class Tacotron2Decoder(Decoder):
     self._model = model
     self._n_feats = self._model.get_data_layer().params['num_audio_features']
     self._gta_forcing = self._model._params["gta_force_inference"]
-    print("GTA forcing")
-    print(self._gta_forcing)
 
     if "both" in self._model.get_data_layer().params['output_type']:
       self._both = True

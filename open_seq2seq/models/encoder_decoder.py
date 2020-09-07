@@ -168,7 +168,8 @@ class EncoderDecoderModel(Model):
       model_outputs = decoder_output.get("outputs", None)
 
       if self._params["save_embeddings"]:
-        model_outputs.append( encoder_output["embedding"] )
+        # model_outputs.append( encoder_output["embedding"] )
+        model_outputs = [encoder_output["embedding"]]
 
       if self.mode == "train" or self.mode == "eval":
         with tf.variable_scope("Loss"):

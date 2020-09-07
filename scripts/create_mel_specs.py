@@ -1,5 +1,6 @@
 import os
 import sys
+import tqdm
 import librosa
 import numpy as np
 import librosa.filters
@@ -20,7 +21,7 @@ def get_speech_features_from_file(
 		trim=False,
 		data_min=1e-5,
 		mel_basis=None,
-		sampling_rate_param=16000
+		sampling_rate_param=22050
 ):
 	""" Helper function to retrieve spectrograms from wav files
 
@@ -48,8 +49,6 @@ def get_speech_features_from_file(
 	if win_length is None:
 		win_length = n_fft
 	signal, fs = librosa.core.load(filename, sr=sampling_rate_param)
-	print("Signal")
-	print(signal[800:820])
 	if hop_length is None:
 		hop_length = int(n_fft / 4)
 	if trim:
@@ -107,9 +106,6 @@ def get_speech_features(
 	complex_spec = librosa.stft( y=signal, n_fft=n_fft, hop_length=hop_length_param, win_length=win_length_param )
 	mag, _ = librosa.magphase( complex_spec, power=mag_power )
 
-	print("Mag")
-	print(mag.shape)
-	print(mag[300][200:220])
 	if mel_basis is None:
 		htk = True
 		norm = None
@@ -121,32 +117,27 @@ def get_speech_features(
 			htk=htk,
 			norm=norm
 		)
-		
-	print("mel_basis")
-	print(mel_basis.shape)
-	print(np.mean(mel_basis))
-	features = np.dot(mel_basis, mag)
-	print("features before log and clamp")
-	print(features[20][250:260])
-	features = np.log(np.clip(features, a_min=data_min, a_max=8000))
-	print("Final features before transpose")
-	print(features[20][250:260])
+	
+	features = np.dot( mel_basis, mag )
+	features = np.log( np.clip(features, a_min=data_min, a_max=8000) )
 	return features.T
 
-for file in os.listdir(input_dir ):
+
+for file in tqdm.tqdm(os.listdir(input_dir )):
 	if( file.split(".")[-1] =="wav" ):
-		mel = get_speech_features_from_file(  os.path.join(input_dir, file),
+		mel = get_speech_features_from_file( 
+										os.path.join( input_dir, file ),
 										num_features=80,
-										n_fft=800,
-										hop_length=200,
-										win_length=800,
-										mag_power=2,
+										n_fft=1024,
+										hop_length=256,
+										win_length=1024,
+										mag_power=1,
 										feature_normalize=False,
 										mean=0.,
 										std=1.,
 										trim=False,
-										data_min=0,
+										data_min=1e-5,
 										mel_basis=None,
-										sampling_rate_param=16000 )
-		print( mel.shape )
-		# np.save( os.path.join(output_dir, file.replace("wav","npy")), mel )
+										sampling_rate_param=22050 )
+		mel = mel.T
+		np.save( os.path.join(output_dir, file.replace("wav","npy")), mel )

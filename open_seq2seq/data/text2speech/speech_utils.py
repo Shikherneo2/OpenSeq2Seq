@@ -14,7 +14,7 @@ def get_speech_features_from_file(
     n_fft=1024,
     hop_length=None,
     win_length=None,
-    mag_power=2,
+    mag_power=1,
     feature_normalize=False,
     mean=0.,
     std=1.,
@@ -107,7 +107,7 @@ def get_speech_features(
     n_fft=1024,
     hop_length_param=256,
     win_length_param=1024,
-    mag_power=2,
+    mag_power=1,
     feature_normalize=False,
     mean=0.,
     std=1.,
@@ -152,7 +152,7 @@ def get_speech_features(
   mag, _ = librosa.magphase(complex_spec, power=mag_power)
 
   if features_type == 'magnitude' or features_type == "both":
-    features = np.log(np.clip(mag, a_min=data_min_mag, a_max=None)).T
+    features = np.log( np.clip(mag, a_min=data_min_mag, a_max=None) ).T
     assert num_features_mag <= n_fft // 2 + 1, \
         "num_features for spectrogram should be <= (fs * window_size // 2 + 1)"
 
@@ -176,7 +176,7 @@ def get_speech_features(
           norm=norm
       )
     features = np.dot(mel_basis, mag)
-    features = np.log(np.clip(features, a_min=data_min_mel, a_max=None)).T
+    features = np.log( np.clip(features, a_min=data_min_mel, a_max=None) ).T
 
   if feature_normalize:
     features = normalize(features, mean, std)
@@ -191,7 +191,7 @@ def get_mel(
     fs=22050,
     n_fft=1024,
     n_mels=80,
-    power=2.,
+    power=1.,
     feature_normalize=False,
     mean=0,
     std=1,

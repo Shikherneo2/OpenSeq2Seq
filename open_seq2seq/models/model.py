@@ -109,9 +109,9 @@ class Model:
             # Parameters for XLA
             'use_xla_jit': bool,
             "save_embeddings": bool,
-						"verbose_inference": bool,
-						'save_mels': bool,
-						'gta_force_inference': bool,
+            "verbose_inference": bool,
+            'save_mels': bool,
+            'gta_force_inference': bool,
         }
 
     def __init__(self, params, mode="train", hvd=None):

@@ -318,14 +318,14 @@ class Text2SpeechDataLayer(DataLayer):
                   )
           )
         self._dataset = self._dataset.padded_batch(
-          self.params['batch_size'],
-          padded_shapes=(
-              [None], 1, [None, num_audio_features], [None], 1
-          ),
-          padding_values=(
-            0, 0, tf.cast(pad_value, dtype=self.params['dtype']),
-            tf.cast(1., dtype=self.params['dtype']), 0
-          ),
+						self.params['batch_size'],
+						padded_shapes=(
+								[None], 1, [None, num_audio_features], [None], 1
+						),
+						padding_values=(
+								0, 0, tf.cast(pad_value, dtype=self.params['dtype']),
+								tf.cast(1., dtype=self.params['dtype']), 0
+						),
         )
 
       elif ( self.params['mode'] == "infer" and self.params["use_saved_embedding"]):

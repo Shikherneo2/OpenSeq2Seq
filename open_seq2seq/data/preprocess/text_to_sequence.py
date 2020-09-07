@@ -5,7 +5,7 @@ from .symbols import symbols
 
 _symbol_to_id = {s: i for i, s in enumerate(symbols)}
 _arpabet = nltk.corpus.cmudict.dict()
-
+del _arpabet["a"]
 # Regular expression matching text enclosed in curly braces:
 _curly_re = re.compile(r'(.*?)\{(.+?)\}(.*)')
 
