@@ -132,7 +132,7 @@ class Text2SpeechDataLayer(DataLayer):
     self.use_cache = self.params.get('use_cache', False)
     self._cache = {}
 
-    if( self.params["mode"] != "infer" ):
+    if( self.params["mode"] != "infer" and self.params["mode"]!="train_with_embeddings" ):
       names = ['wav_filename', 'raw_transcript', 'transcript']
     else:
       names = ['wav_filename', 'transcript', 'fileid']
@@ -242,7 +242,7 @@ class Text2SpeechDataLayer(DataLayer):
       indices = self._files['transcript'].str.len().sort_values().index
       self._files = self._files.reindex(indices)
 
-    if (self.params['mode'] != 'infer'):
+    if (self.params['mode'] != 'infer' and self.params["mode"]!="train_with_embeddings"):
       cols = ['wav_filename', 'transcript']
     else:
       cols = ['wav_filename', 'transcript', 'fileid']
@@ -328,7 +328,7 @@ class Text2SpeechDataLayer(DataLayer):
 						),
         )
 
-      elif ( self.params['mode'] == "infer" and self.params["use_saved_embedding"]):
+      elif ( (self.params['mode'] == "infer" and self.params["use_saved_embedding"]) or self.params["mode"]=="train_with_embeddings"):
         self._dataset = self._dataset.map(
           lambda line: tf.py_func(
             self._parse_audio_transcript_element,
@@ -404,6 +404,8 @@ class Text2SpeechDataLayer(DataLayer):
 
       if( self.params['mode'] != 'infer' ):
         text, text_length, spec, stop_token_target, spec_length = self._iterator.get_next()
+      elif self.params['mode'] == "train_with_embeddings":
+        text, text_length, spec, stop_token_target, spec_length, embedding = self._iterator.get_next()
       else:
         if (self.params["use_saved_embedding"]):
           text, text_length, spec, stop_token_target, spec_length, file_id, embedding = self._iterator.get_next()
@@ -441,7 +443,12 @@ class Text2SpeechDataLayer(DataLayer):
         if self._model._params["gta_force_inference"] is True:
           self._input_tensors['target_tensors'] = [
             spec, stop_token_target, spec_length
-          ]	
+          ]
+      elif self.params['mode'] == "train_with_embeddings":
+        self._input_tensors["source_tensors"].append( embedding )
+        self._input_tensors['target_tensors'] = [
+          spec, stop_token_target, spec_length
+        ]
       else:
         self._input_tensors['target_tensors'] = [
             spec, stop_token_target, spec_length
@@ -460,7 +467,7 @@ class Text2SpeechDataLayer(DataLayer):
       length of target sequence.
 
     """
-    if self.params["mode"]!="infer":
+    if self.params["mode"]!="infer" and self.params["mode"]!="train_with_embeddings":
       audio_filename, transcript = element
     else:
       audio_filename, transcript, file_id = element
@@ -595,13 +602,21 @@ class Text2SpeechDataLayer(DataLayer):
     else:
       stop_token_target[-1] = 1.
 
-    if( self.params["mode"]=="infer" and self.params["use_saved_embedding"] ):
+    if( (self.params["mode"]=="infer" and self.params["use_saved_embedding"]) or self.params["mode"]=="train_with_embeddings" ):
       embedding = np.reshape(np.load( os.path.join(self.params["saved_embedding_location"], "embed-"+str(file_id)+".npy" ) ), (1,512))
 
     assert len(text_input) % pad_to == 0
     assert len(spectrogram) % pad_to == 0
 
-    if self.params["mode"]=="infer":
+    if self.params["mode"]=="train_with_embeddings":
+      return np.int32(text_input), \
+            np.int32([len(text_input)]), \
+            spectrogram.astype(self.params['dtype'].as_numpy_dtype()), \
+            stop_token_target.astype(self.params['dtype'].as_numpy_dtype()), \
+            np.int32([len(spectrogram)]), \
+            embedding.astype(self.params['dtype'].as_numpy_dtype())
+
+    elif self.params["mode"]=="infer":
       if (self.params["use_saved_embedding"]):
         return np.int32(text_input), \
             np.int32([len(text_input)]), \
